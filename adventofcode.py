@@ -1,4 +1,5 @@
 import argparse, heapq, re
+from functools import reduce
 
 
 def day1():
@@ -148,6 +149,63 @@ def day7():
 
         needed = 30000000 - (70000000 - sizes[0])
         print(min(x for x in sorted(sizes) if x >= needed))
+
+
+def day8():
+    with open('input8.txt') as f:
+        a = [[int(x) for x in line.strip()] for line in f]
+        v = [[False] * len(r) for r in a]
+
+        def mark(n, m, idx):
+            for i in range(n):
+                t = -1
+                for j in range(m):
+                    ii, jj = idx(i, j)
+                    if a[ii][jj] > t:
+                        v[ii][jj] = True
+                        t = a[ii][jj]
+
+        n, m = len(v), len(v[0])
+        mark(n, m, lambda i, j: (i, j))
+        mark(n, m, lambda i, j: (i, m - j - 1))
+        mark(m, n, lambda i, j: (j, i))
+        mark(m, n, lambda i, j: (n - j - 1, i))
+        print(sum(sum(r) for r in v))
+
+        z = [[0] * m for i in range(n)]
+        for i in range(1, n - 1):
+            for j in range(1, m - 1):
+                k = []
+                for di,dj in [[0, -1], [-1, 0], [0, 1], [1, 0]]:
+                    ii = i + di
+                    jj = j + dj
+                    while ii in range(1, n - 1) and jj in range(1, m - 1) and a[i][j] > a[ii][jj]:
+                        ii += di
+                        jj += dj
+                    k.append(abs(i - ii + j - jj))
+                z[i][j] = reduce(lambda x, y: x * y, k)
+        print(max(max(x) for x in z))
+
+
+def day9():
+    with open('input9.txt') as f:
+        dirs = {'R': (0, 1), 'U': (1, 0), 'L': (0, -1), 'D': (-1, 0)}
+        ph = (0, 0)
+        pt = [(0, 0)] * 9
+        visited = set()
+        norm = lambda x: x // 2 if abs(x) > 1 else x
+        for line in f:
+            dir, n = line.split()
+            for _ in range(int(n)):
+                ph = tuple(map(sum, zip(ph, dirs[dir])))
+                p = ph
+                for i in range(len(pt)):
+                    d = (p[0] - pt[i][0], p[1] - pt[i][1])
+                    if any(abs(x) > 1 for x in d):
+                        pt[i] = (pt[i][0] + norm(d[0]), pt[i][1] + norm(d[1]))
+                    p = pt[i]
+                visited.add(pt[-1])
+        print(len(visited))
 
 
 if __name__ == "__main__":
