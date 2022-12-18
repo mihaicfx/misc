@@ -277,6 +277,43 @@ def day11():
         print(top[0] * top[1])
 
 
+def day12():
+    def traverse(S, e, m, stepCond):
+        dirs = [(0,1), (1,0), (0,-1), (-1,0)]
+        s = [(S, 1)]
+        visited = {} # can be used to trace back too
+        dist = 0
+        while s and not dist:
+            p, cd = s.pop(0)
+            a = m[p[0]][p[1]]
+            for d in dirs:
+                ii, jj = (p[0] + d[0], p[1] + d[1])
+                if 0 <= ii < len(m) and 0 <= jj < len(m[0]) and (ii, jj) not in visited:
+                    if stepCond(a, m[ii][jj]):
+                        if m[ii][jj] == e:
+                            dist = cd
+                            break
+                        s.append(((ii, jj), cd + 1))
+                        visited[(ii, jj)] = p
+        return dist
+
+    with open('input12_test.txt') as f:
+        m = []
+        S = None
+        E = None
+        for i, line in enumerate(f):
+            if 'S' in line:
+                S = (i, line.index('S'))
+                line = line[:S[1]] + chr(ord('a') - 1) + line[S[1] + 1:]
+            if 'E' in line:
+                E = (i, line.index('E'))
+                line = line[:E[1]] + chr(ord('z') + 1) + line[E[1] + 1:]
+            m.append(line.strip())
+
+        print(traverse(S, m[E[0]][E[1]], m, lambda a,b: chr(ord(a) + 1) >= b))
+        print(traverse(E, 'a', m, lambda a,b: b >= chr(ord(a) - 1)))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Solve problems on https://adventofcode.com/2022/')
     parser.add_argument('day', metavar='d', type=str, help='problem to solve')
