@@ -208,6 +208,75 @@ def day9():
         print(len(visited))
 
 
+def day10():
+    with open('input10.txt') as f:
+        rx = 1
+        cycle = 0
+        th = 20
+        total = 0
+
+        screen = ''
+        N = 40
+
+        for line in f:
+            isAdd = line.startswith("addx")
+            for i in range(1 + isAdd):
+                screen += '#' if rx - 1 <= cycle % N <= rx + 1 else '.'
+                cycle += 1
+            if cycle >= th:
+                total += th * rx
+                th += 40
+            rx += int(line[5:]) if isAdd else 0
+        print(total)
+        for i in range(0, len(screen), N):
+            print(screen[i:i + N])
+
+
+def day11():
+    class Monkey:
+        def __init__(self):
+            self.items = []
+            self.oper = None
+            self.divBy = 1
+            self.dest = [0] * 2
+            self.inspected = 0
+
+    def readFrom(line, regex):
+        m = re.match(regex, line)
+        return m.group(1) if m else None
+
+    with open('input11.txt') as f:
+        lines = f.readlines()
+        monkeys = []
+        # opers = {'^': lambda x,v: x * x, '*': lambda x,v: x * v, '+': lambda x,v: x + v}
+        for i in range(0, len(lines), 7):
+            m = Monkey()
+            items = readFrom(lines[i + 1], '  Starting items: ((\d+, )*\d+)')
+            m.items = [int(x) for x in items.split(", ")]
+            m.oper = readFrom(lines[i + 2], '  Operation: ([^\n]+)')
+            # m.oper, m.operVal = (opers['^'], 0) if oper == '* old' else (opers[oper[0]], int(oper[1:]))
+            m.divBy = int(readFrom(lines[i + 3], '  Test: divisible by (\d+)'))
+            m.dest[0] = int(readFrom(lines[i + 4], '    If true: throw to monkey (\d+)'))
+            m.dest[1] = int(readFrom(lines[i + 5], '    If false: throw to monkey (\d+)'))
+            monkeys.append(m)
+
+        MOD = 9699690
+        for _ in range(10000):
+            for m in monkeys:
+                for item in m.items:
+                    env = {'old': item, '__builtins__': {}}
+                    exec(m.oper, env)
+                    val = env['new'] # // 3
+                    # val = m.oper(item, m.operVal) # // 3
+                    dest = m.dest[val % m.divBy != 0]
+                    monkeys[dest].items.append(val % MOD)
+                m.inspected += len(m.items)
+                m.items.clear()
+
+        top = sorted([x.inspected for x in monkeys], reverse=True)[:2]
+        print(top[0] * top[1])
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Solve problems on https://adventofcode.com/2022/')
     parser.add_argument('day', metavar='d', type=str, help='problem to solve')
