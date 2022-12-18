@@ -1,5 +1,5 @@
 import argparse, heapq, re
-from functools import reduce
+from functools import reduce, cmp_to_key
 
 
 def day1():
@@ -312,6 +312,37 @@ def day12():
 
         print(traverse(S, m[E[0]][E[1]], m, lambda a,b: chr(ord(a) + 1) >= b))
         print(traverse(E, 'a', m, lambda a,b: b >= chr(ord(a) - 1)))
+
+
+def day13():
+    def compare(a, b):
+        if type(a) == type(b):
+            if type(a) is int:
+                return a - b
+            for i in range(min(len(a), len(b))):
+                r = compare(a[i], b[i])
+                if r:
+                    return r
+            return len(a) - len(b)
+        elif type(a) is int:
+            return compare([a], b)
+        else:
+            return compare(a, [b])
+
+    with open('input13.txt') as f:
+        lines = f.readlines()
+        total = 0
+        d1, d2 = [[2]], [[6]]
+        all = [d1, d2]
+        for i in range((len(lines) // 3) + 1):
+            a, b = eval(lines[3 * i]), eval(lines[3 * i + 1])
+            r = compare(a, b)
+            if r <= 0:
+                total += i + 1
+            all += [a, b]
+        print(total)
+        all.sort(key=cmp_to_key(compare))
+        print((all.index(d1) + 1) * (all.index(d2) + 1))
 
 
 if __name__ == "__main__":
