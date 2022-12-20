@@ -345,6 +345,89 @@ def day13():
         print((all.index(d1) + 1) * (all.index(d2) + 1))
 
 
+def day14():
+    with open('input14.txt') as f:
+        partTwo = True
+        xmin, xmax = 500, 500
+        ymax = 0
+        lines = []
+        for line in f:
+            a = [[int(x) for x in p.split(',')] for p in line.split(' -> ')]
+            xmin = min(xmin, min(x[0] for x in a) - 1)
+            xmax = max(xmax, max(x[0] for x in a) + 1)
+            ymax = max(ymax, max(x[1] for x in a) + 1)
+            lines.append(a)
+        if partTwo:
+            xmin, xmax = min(xmin, 500 - ymax), max(xmax, 500 + ymax)
+
+        m = [['.'] * (xmax - xmin + 1) for _ in range(ymax + 1)]
+        for a in lines:
+            for i in range(len(a) - 1):
+                p = a[i]
+                d = [(x - y) // (abs(x - y) or 1) for x,y in zip(a[i + 1], a[i])]
+                while True:
+                    m[p[1]][p[0] - xmin] = '#'
+                    if p == a[i + 1]:
+                        break
+                    p = [p[0] + d[0], p[1] + d[1]]
+        # for a in m: print(''.join(a))
+        n = 0
+        start = [500 - xmin, 0]
+        while m[start[1]][start[0]] == '.':
+            p = start
+            while m[p[1]][p[0]] != 'o':
+                if p[1] == ymax:
+                    if not partTwo:
+                        m[start[1]][start[0]] = '~' # falling out, mark as done
+                    else:
+                        m[p[1]][p[0]] = 'o' # bottom, stop here
+                        n += 1
+                    break
+                for dx,dy in [[0, 1], [-1, 1], [1, 1]]:
+                    pp = p[0] + dx, p[1] + dy
+                    if m[pp[1]][pp[0]] == '.':
+                        p = pp
+                        break
+                else:
+                    m[p[1]][p[0]] = 'o'
+                    n += 1
+        print(n)
+
+
+def day15():
+    with open('input15.txt') as f:
+        data = []
+        for line in f:
+            m = re.match("Sensor at x=(-?\d+), y=(-?\d+): closest beacon is at x=(-?\d+), y=(-?\d+)", line)
+            data.append([int(x) for x in m.group(1,2,3,4)])
+
+        def intervals(Y):
+            res = []
+            for sx,sy,bx,by in data:
+                md = abs(bx - sx) + abs(sy - by)
+                d = md - abs(sy - Y)
+                if d >= 0:
+                    res.append((sx - d, sx + d))
+            return sorted(res)
+
+        Y = 2000000
+        total = -len(set(bx for sx,sy,bx,by in data if by == Y))
+        le = -1e10
+        for s,e in intervals(Y):
+            s = max(s, le)
+            if s < e:
+                total += e - s + 1
+                le = e + 1
+        print(total)
+
+        for y in range(0, 4000001):
+            le = 0
+            for s,e in intervals(y):
+                if s > le:
+                    print(y, le, s, y + 4000000 * (s - 1))
+                le = max(e, le)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Solve problems on https://adventofcode.com/2022/')
     parser.add_argument('day', metavar='d', type=str, help='problem to solve')
