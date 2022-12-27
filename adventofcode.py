@@ -552,6 +552,54 @@ def day17():
         print(ntop + top)
 
 
+def day18():
+    with open('input18.txt') as f:
+        pts = set()
+        for line in f:
+            pts.add(tuple([int(x) for x in line.split(',')]))
+        dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]]
+
+        def outsideArea(points):
+            total = 0
+            for px,py,pz in points:
+                for dx,dy,dz in dirs:
+                    if (px+dx, py+dy, pz+dz) not in points:
+                        total += 1
+            return total
+        totalArea = outsideArea(pts)
+        print(totalArea)
+
+        mima = [[min(x),max(x)+1] for x in zip(*pts)]
+        vis = set()
+
+        def bfs(p):
+            result, outside = [p], False
+            st = deque([p])
+            while st:
+                x,y,z = st.popleft()
+                for dx,dy,dz in dirs:
+                    pp = (x + dx, y + dy, z + dz)
+                    if pp not in pts and pp not in vis:
+                        if any(v not in range(*r) for v,r in zip(pp, mima)):
+                            outside = True
+                        else:
+                            result.append(pp)
+                            vis.add(pp)
+                            st.append(pp)
+            return result, outside
+
+        for x in range(*mima[0]):
+            for y in range(*mima[1]):
+                for z in range(*mima[2]):
+                    p = (x,y,z)
+                    if p not in pts and p not in vis:
+                        points, outside = bfs(p)
+                        if points and not outside:
+                            area = outsideArea(set(points))
+                            totalArea -= area
+        print(totalArea)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Solve problems on https://adventofcode.com/2022/')
     parser.add_argument('day', metavar='d', type=str, help='problem to solve')
