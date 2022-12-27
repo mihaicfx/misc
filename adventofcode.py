@@ -1,6 +1,6 @@
-import argparse, heapq, re
+import argparse, heapq, re, itertools
 from functools import reduce, cmp_to_key
-
+from collections import deque
 
 def day1():
     with open('input1.txt') as f:
@@ -426,6 +426,130 @@ def day15():
                 if s > le:
                     print(y, le, s, y + 4000000 * (s - 1))
                 le = max(e, le)
+
+
+def day16():
+    graph = {}
+    flows = {}
+    cache = {}
+
+    def findBest(valve, minutes, taken):
+        if minutes < 2:
+            return (0, '')
+        cs = valve + str(minutes) + taken
+        if cs in cache:
+            return cache[cs]
+        f = flows.get(valve)
+        r = (0, '')
+        if f:
+            flows[valve] = 0
+            fb = findBest(valve, minutes - 1, taken + valve)
+            r = max(r, (f * (minutes - 1) + fb[0], valve + fb[1]))
+            flows[valve] = f
+        else:
+            for v,d in graph[valve].items():
+                if flows.get(v):
+                    r = max(r, findBest(v, minutes - d, taken))
+        cache[cs] = r
+        return r
+
+    with open('input16_test.txt') as f:
+        for line in f:
+            m = re.match("Valve ([A-Z]{2}) has flow rate=(\d+); tunnels? leads? to valves? ([A-Z, ]+)", line)
+            n, f, vs = m.group(1), int(m.group(2)), m.group(3).split(', ')
+            flows[n] = f
+            graph[n] = {v:1 for v in vs}
+        # Floyd-Warshall, for all-to-all paths
+        for k in graph.keys():
+            for i in graph.keys():
+                for j in graph.keys():
+                    if i != j:
+                        ik, kj = graph[i].get(k, 99), graph[k].get(j, 99)
+                        if graph[i].get(j, 99) > ik + kj:
+                            graph[i][j] = ik + kj
+        # take out destinations with flow 0
+        graph = {n:{v:d for v,d in vs.items() if flows[v]} for n,vs in graph.items()}
+        r, vs = findBest('AA', 30, '')
+        print(r, vs)
+
+        # Part 2 runs for about 7 minutes.. 
+        nz = [n for n,v in flows.items() if v]
+        bflows = dict(flows)
+        rr = (0, '')
+        for l in range(1, len(nz)):
+            for subset in itertools.combinations(nz[1:], l):
+                rest = [n for n in nz if n not in subset]
+                flows = {n:bflows[n] for n in rest}
+                r1, v1 = findBest('AA', 26, ''.join(subset))
+                flows = {n:bflows[n] for n in subset}
+                r2, v2 = findBest('AA', 26, ''.join(rest))
+                rr = max(rr, (r1 + r2, v1 + v2))
+        print(rr)
+
+
+def day17():
+    with open('input17.txt') as f:
+        dirs = f.readline().strip()
+        rocks = [[0b000111100], 
+            [0b000010000, 0b000111000, 0b000010000], 
+            [0b000111000, 0b000001000, 0b000001000],
+            [0b000100000, 0b000100000, 0b000100000, 0b000100000], 
+            [0b000110000, 0b000110000]]
+        
+        d = 0
+        top = 0
+        ntop = 0
+        base = deque([0b111111111])
+
+        tops = []
+        lasttop = 0
+        dtops = {}
+        cycleFound = False
+
+        n = 0
+        N = 1000000000000 # 2022
+        while n < N:
+            rock = rocks[n % len(rocks)]
+            ry = top + 4
+            for _ in range(len(base), ry + len(rock)):
+                base.append(0b100000001)
+            while True:
+                sl = dirs[d % len(dirs)] == '<'
+                d += 1
+                rs = [r << 1 if sl else r >> 1 for r in rock]
+                if all((base[ry + i] & r) == 0 for i,r in enumerate(rs)):
+                    rock = rs
+                if all((base[ry - 1 + i] & r) == 0 for i,r in enumerate(rock)):
+                    ry -= 1
+                else:
+                    for i,r in enumerate(rock):
+                        base[ry + i] |= r
+                    top = max(top, ry + len(rock) - 1)
+                    break
+            n += 1
+
+            if not cycleFound:
+                if (d % len(dirs)) < 100:
+                    tops.append((d % len(dirs)) * 100 + (ntop + top - lasttop) * 10 + (n % len(rocks)))
+                elif tops:
+                    key = tuple(tops)
+                    tops.clear()
+                    if key in dtops:
+                        pn, ptop = dtops[key]
+                        period = n - pn
+                        cycles = (N - n) // period
+                        n += period * cycles
+                        ntop += (ntop + top - ptop) * cycles
+                        cycleFound = True
+                    else:
+                        dtops[key] = (n, ntop + top)
+                lasttop = ntop + top
+
+            while len(base) > 100:
+                base.popleft()
+                top -= 1
+                ntop += 1
+        print(ntop + top)
 
 
 if __name__ == "__main__":
