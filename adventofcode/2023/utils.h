@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <memory>
 #include <thread>
+#include <optional>
 
 namespace utils
 {
@@ -19,120 +20,79 @@ public:
     MyException(const std::string &msg) : std::runtime_error(msg.c_str()) {}
 };
 
+struct FileReader {
+    struct LineReader {
+        const std::string& line;
+        int pos = 0;
 
-// progress reporter for large tasks
-class ProgressReport
-{
-    std::clock_t start;
-    std::clock_t lastReport;
-    std::clock_t lastEstimate;
-    float intervalReport;
-    float intervalEstimate;
+        template<class T>
+        bool read(const char* fmt, T* var);
+    };
 
-    inline float difft(std::clock_t start, std::clock_t end);
+    FileReader(const std::filesystem::path& fileName);
+    ~FileReader();
 
-public:
-    inline ProgressReport(float interval = 5.0);
-    inline void tick(int progress, int end);
+    bool nextLine();
+    LineReader getLine();
+    std::vector<std::string> allLines();
+
+    FILE* f;
+    std::string line;
 };
-
-
-// helper class
-struct StringToIdMap {
-    std::unordered_map<std::string, int> fwd;
-    std::unordered_map<int, const std::string*> bwd;
-
-    int set(std::string s);
-    const std::string& get(int id);
-};
-
 
 inline std::vector<std::pair<int, int>> splitWork(int size);
 
-inline FILE* checkedFopen(const std::filesystem::path& fileName);
-inline int readInt(FILE *f, const std::string& what="?");
-inline std::string readString(FILE *f, int maxLen, const std::string& what="?");
-inline void printInt(FILE *f, int value, bool nl=false);
-inline void printString(FILE *f, const std::string& what, bool nl=false);
-
 //-----------------------------------------------------------------------------
 
-float ProgressReport::difft(std::clock_t start, std::clock_t end)
-{
-    return (end - start) / (float)CLOCKS_PER_SEC;
-}
-
-ProgressReport::ProgressReport(float interval) {
-    this->start = std::clock();
-    this->lastReport = this->start;
-    this->lastEstimate = this->start;
-    this->intervalReport = interval;
-    this->intervalEstimate = 10 * interval;
-}
-
-void ProgressReport::tick(int progress, int end) {
-    std::clock_t now = std::clock();
-    if (this->difft(this->lastReport, now) >= this->intervalReport) {
-        printf("~%d%%", int(100ll * progress / end));
-        this->lastReport = now;
-    }
-    if (this->difft(this->lastEstimate, now) >= this->intervalEstimate) {
-        float elapsed = this->difft(this->start, now);
-        int remaining = int((end - progress) * (elapsed / progress));
-        printf("E:%dm%02ds\n", remaining / 60, remaining % 60);
-        this->lastEstimate = now;
-    }
-}
-
-
-
-FILE* checkedFopen(const std::filesystem::path& fileName) {
-    FILE* f = fopen(fileName.string().c_str(), "rt");
+FileReader::FileReader(const std::filesystem::path& fileName) {
+    f = fopen(fileName.string().c_str(), "rt");
     if (!f) {
         throw MyException("error opening file " + fileName.string());
     }
-    return f;
 }
 
-int readInt(FILE *f, const std::string& what) {
-    int x;
-    if (fscanf(f, "%d", &x) != 1) {
-        throw MyException("error reading int " + what);
+FileReader::~FileReader() {
+    if (f) fclose(f);
+}
+
+bool FileReader::nextLine() {
+    line.clear();
+    char buf[256];
+    bool read = false;
+    while (fgets(buf, std::size(buf), f)) {
+        read = true;
+        line += buf;
+        if (line.back() == '\n') {
+            while (!line.empty() && isspace(line.back())) {
+                line.pop_back();
+            }
+            break;
+        }
     }
-    return x;
+    return read;
 }
 
-std::string readString(FILE *f, int maxLen, const std::string& what) {
-    std::string buf(maxLen + 1, '\0');
-    const std::string format = "%" + std::to_string(maxLen) + "s";
-    if (fscanf(f, format.c_str(), buf.data()) != 1) {
-        throw MyException("error reading string " + what);
+std::vector<std::string> FileReader::allLines() {
+    std::vector<std::string> lines;
+    while (nextLine()) {
+        lines.emplace_back(getLine().line);
     }
-    return buf;
+    return lines;
 }
 
-void printInt(FILE *f, int value, bool nl) {
-    fprintf(f, "%d", value);
-    if (nl) fprintf(f, "\n");
+FileReader::LineReader FileReader::getLine() {
+    return {line};
 }
 
-void printString(FILE *f, const std::string& what, bool nl) {
-    fprintf(f, "%s", what.c_str());
-    if (nl) fprintf(f, "\n");
-}
-
-
-int StringToIdMap::set(std::string s) {
-    auto it = fwd.find(s);
-    if (it == fwd.end()) {
-        it = fwd.insert(it, {std::move(s), fwd.size() + 1});
+template<class T>
+bool FileReader::LineReader::read(const char* fmt, T* var) {
+    int n = 0;
+    const std::string format = std::string(fmt) + "%n";
+    if (sscanf(line.data() + pos, format.c_str(), var, &n) == 1) {
+        pos += n;
+        return true;
     }
-    bwd.insert({it->second, &it->first});
-    return it->second;
-}
-
-const std::string& StringToIdMap::get(int id) {
-    return *bwd.at(id);
+    return {};
 }
 
 
