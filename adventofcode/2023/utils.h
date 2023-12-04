@@ -22,11 +22,15 @@ public:
 
 struct FileReader {
     struct LineReader {
+        LineReader(const std::string& _line) : line(_line) {}
+        const std::string& get() { return line; }
+
+        template<typename... Args>
+        bool read(const char* fmt, Args... args);
+
+     private:
         const std::string& line;
         int pos = 0;
-
-        template<class T>
-        bool read(const char* fmt, T* var);
     };
 
     FileReader(const std::filesystem::path& fileName);
@@ -41,6 +45,7 @@ struct FileReader {
 };
 
 inline std::vector<std::pair<int, int>> splitWork(int size);
+int digits(int n);
 
 //-----------------------------------------------------------------------------
 
@@ -75,7 +80,8 @@ bool FileReader::nextLine() {
 std::vector<std::string> FileReader::allLines() {
     std::vector<std::string> lines;
     while (nextLine()) {
-        lines.emplace_back(getLine().line);
+        getLine();
+        lines.emplace_back(std::move(line));
     }
     return lines;
 }
@@ -84,17 +90,16 @@ FileReader::LineReader FileReader::getLine() {
     return {line};
 }
 
-template<class T>
-bool FileReader::LineReader::read(const char* fmt, T* var) {
-    int n = 0;
+template<typename... Args>
+bool FileReader::LineReader::read(const char* fmt, Args... args) {
+    int n = -1;
     const std::string format = std::string(fmt) + "%n";
-    if (sscanf(line.data() + pos, format.c_str(), var, &n) == 1) {
+    if (sscanf(line.data() + pos, format.c_str(), args..., &n) == sizeof...(args) && n != -1) {
         pos += n;
         return true;
     }
     return {};
 }
-
 
 std::vector<std::pair<int, int>> splitWork(int size)
 {
@@ -109,6 +114,12 @@ std::vector<std::pair<int, int>> splitWork(int size)
         start = end;
     }
     return result;
+}
+
+int digits(int n) {
+    int res = 0;
+    while (n > 0) res++, n /= 10;
+    return res;
 }
 
 } // namespace utils
