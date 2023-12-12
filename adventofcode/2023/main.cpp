@@ -27,7 +27,7 @@ void day1(utils::FileReader& reader) {
     const std::array<std::string, 9> words = {
         "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"
     };
-    while (fscanf(reader.f, "%99s", buf) == 1) {
+    while (reader.nextLine() && reader.getLine().read("%99s", buf)) {
         int a = -1, b = -1;
         const int n = strlen(buf);
         for (int i = 0; i < n; ++i) {

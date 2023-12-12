@@ -6,8 +6,11 @@
 #include <vector>
 #include <filesystem>
 #include <unordered_map>
+#include <map>
+#include <set>
+#include <stack>
+#include <queue>
 #include <memory>
-#include <thread>
 #include <optional>
 
 namespace utils
@@ -19,6 +22,7 @@ class MyException : public std::runtime_error
 public:
     MyException(const std::string &msg) : std::runtime_error(msg.c_str()) {}
 };
+
 
 struct FileReader {
     struct LineReader {
@@ -40,55 +44,39 @@ struct FileReader {
     LineReader getLine();
     std::vector<std::string> allLines();
 
+  private:
     FILE* f;
     std::string line;
 };
 
+
+struct StringToIdMap {
+    int set(std::string s);
+    const std::string& get(int id);
+
+  private:
+    std::unordered_map<std::string, int> fwd;
+    std::unordered_map<int, const std::string*> bwd;
+};
+
+
 inline std::vector<std::pair<int, int>> splitWork(int size);
-int digits(int n);
+
+int digits(long long n);
+
+namespace detail
+{
+template <typename Arg, typename... Args>
+void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args);
+} // namespace detail
+
+#define PRINT(...)  utils::detail::print(std::cout, #__VA_ARGS__, __VA_ARGS__)
+
+
+static constexpr std::initializer_list<std::pair<int, int>> DIR4 = {{-1,0}, {0,-1}, {1, 0}, {0, 1}};
+static constexpr std::initializer_list<std::pair<int, int>> DIR9 = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1, 0}, {1,1}, {0, 1}, {-1,1}};
 
 //-----------------------------------------------------------------------------
-
-FileReader::FileReader(const std::filesystem::path& fileName) {
-    f = fopen(fileName.string().c_str(), "rt");
-    if (!f) {
-        throw MyException("error opening file " + fileName.string());
-    }
-}
-
-FileReader::~FileReader() {
-    if (f) fclose(f);
-}
-
-bool FileReader::nextLine() {
-    line.clear();
-    char buf[256];
-    bool read = false;
-    while (fgets(buf, std::size(buf), f)) {
-        read = true;
-        line += buf;
-        if (line.back() == '\n') {
-            while (!line.empty() && isspace(line.back())) {
-                line.pop_back();
-            }
-            break;
-        }
-    }
-    return read;
-}
-
-std::vector<std::string> FileReader::allLines() {
-    std::vector<std::string> lines;
-    while (nextLine()) {
-        getLine();
-        lines.emplace_back(std::move(line));
-    }
-    return lines;
-}
-
-FileReader::LineReader FileReader::getLine() {
-    return {line};
-}
 
 template<typename... Args>
 bool FileReader::LineReader::read(const char* fmt, Args... args) {
@@ -98,28 +86,53 @@ bool FileReader::LineReader::read(const char* fmt, Args... args) {
         pos += n;
         return true;
     }
-    return {};
+    return false;
 }
 
-std::vector<std::pair<int, int>> splitWork(int size)
+namespace detail
 {
-    int n = std::min(size, (int)std::thread::hardware_concurrency());
-    int chunksSize = size / n;
-    int remainder = size % n;
-    std::vector<std::pair<int, int>> result;
-    int start = 0;
-    for (int i = 0; i < n; i++) {
-        int end = start + chunksSize + (i < remainder);
-        result.push_back({start, end});
-        start = end;
-    }
-    return result;
+
+const char* print_name(std::ostream& os, const char* p);
+
+template <typename Arg, typename... Args>
+void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args) {
+    nl = print_name(os, nl); os << std::forward<Arg>(arg) << "\n";
+    ((nl = print_name(os, nl), os << std::forward<Args>(args) << "\n"), ...);
 }
 
-int digits(int n) {
-    int res = 0;
-    while (n > 0) res++, n /= 10;
-    return res;
+namespace is_stl_container_impl {
+  template <typename T>       struct is_stl_container:std::false_type{};
+  template <typename T, std::size_t N> struct is_stl_container<std::array    <T,N>>    :std::true_type{};
+  template <typename... Args> struct is_stl_container<std::vector            <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::deque             <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::list              <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::set               <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::map               <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::unordered_map     <Args...>>:std::true_type{};
+  // others removed for simplicity. see https://stackoverflow.com/questions/9407367/determine-if-a-type-is-an-stl-container-at-compile-time
+}
+
+template <typename T> struct is_stl_container {
+  static constexpr bool const value = is_stl_container_impl::is_stl_container<std::decay_t<T>>::value;
+};
+
+} // namespace detail
+
+
+template <class Container, std::enable_if_t<detail::is_stl_container<Container>::value, bool> = true>
+std::ostream& operator<<(std::ostream& os, const Container& c) {
+    os << "[";
+    for (const auto& el : c) {
+        os << el << ", ";
+    }
+    os << "]";
+    return os;
+}
+
+template <typename T, typename U>
+std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& p) {
+    os << "(" << p.first << ", " << p.second << ")";
+    return os;
 }
 
 } // namespace utils
