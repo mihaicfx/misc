@@ -525,13 +525,148 @@ void day12(utils::FileReader& reader) {
 //-----------------------------------------------------------------------------
 void day13(utils::FileReader& reader) {
     int64_t res = 0;
+    auto lines = reader.allLines();
+    int s = 0;
+    for (int i = 0; i <= lines.size(); ++i) {
+        if (i == lines.size() || lines[i].empty()) {
+            // check column mirror
+            for (int k = 1; k < lines[s].length() ; ++k) {
+                int diff = 0;
+                for (int j = s; j < i; ++j) {
+                    for (int d = 0; k - d - 1 >= 0 && k + d < lines[s].length(); ++d) {
+                        diff += lines[j][k - d - 1] != lines[j][k + d];
+                    }
+                }
+                if (diff == PART - 1) {
+                    res += k;
+                    break;
+                }
+            }
+            // check row mirror
+            for (int k = s + 1; k < i; ++k) {
+                int diff = 0;
+                for (int j = 0; j < lines[s].length(); ++j) {
+                    for (int d = 0; k - d - 1 >= s && k + d < i; ++d) {
+                        diff += lines[k - d - 1][j] != lines[k + d][j];
+                    }
+                }
+                if (diff == PART - 1) {
+                    res += (k - s) * 100;
+                    break;
+                }
+            }
+            s = i + 1;
+        }
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day14_roll(int n, int m, const std::function<char&(int,int)>& getter) {
+    for (int j = 0; j < m; ++j) {
+        int p = 0;
+        for (int i = 0; i < n; ++i) {
+            switch (getter(i,j)) {
+                case 'O': std::swap(getter(p,j), getter(i,j)); p++; break;
+                case '#': p = i + 1; break;
+            }
+        }
+    }
+}
+
+void day14_roll4(std::vector<std::string>& lines, int n, int m) {
+    day14_roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
+    day14_roll(m, n, [&](int i, int j) -> char& { return lines[j][i]; });
+    day14_roll(n, m, [&](int i, int j) -> char& { return lines[n - i - 1][j]; });
+    day14_roll(m, n, [&](int i, int j) -> char& { return lines[j][n - i - 1]; });
+}
+
+void day14(utils::FileReader& reader) {
+    int64_t res = 0;
+    auto lines = reader.allLines();
+    const int n = lines.size();
+    const int m = lines[0].size();
+    if (PART == 1) {
+        day14_roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
+    } else {
+        // generic tortoise and hare algorithm revealed that the cycle starts very soon (< 100 iterations), so we can brute check
+        auto lines1 = lines;
+        std::vector<std::vector<std::string>> alllines;
+        std::pair<int, int> found = {-1,-1};
+        for (int i = 0; found.first == -1; ++i) {
+            day14_roll4(lines1, n, m);
+            for (int j = 0; j < i; ++j) {
+                if (lines1 == alllines[j]) {
+                    found = {j + 1, i + 1};
+                    break;
+                }
+            }
+            alllines.push_back(lines1);
+        }
+        PRINT(found);
+        for (int i = 0; i < found.first + ((1'000'000'000 - found.second) % (found.second - found.first)); ++i) {
+            day14_roll4(lines, n, m);
+        }
+    }
+    // score
+    for (int j = 0; j < lines[0].size(); ++j) {
+        for (int i = 0; i < n; ++i) {
+            if (lines[i][j] == 'O') {
+                res += (n - i);
+            }
+        }
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day15(utils::FileReader& reader) {
+    int64_t res[2] = {};
+    if (!reader.nextLine()) {
+        throw utils::MyException("failed to read file");
+    }
+    std::array<std::vector<std::pair<std::string, int>>, 256> mp;
+    auto line = reader.getLine();
+    for (auto str : line.split(',')) {
+        int h1 = 0, h2 = 0, k = 0;
+        for (int i = 0; i < str.length(); ++i) {
+            h1 = ((h1 + str[i]) * 17) % 256;
+            if (isalpha(str[i])) {
+                h2 = h1;
+                k = i + 1;
+            }
+        }
+        res[0] += h1;
+        // part 2
+        auto s2 = str.substr(0, k);
+        auto it = std::find_if(mp[h2].begin(), mp[h2].end(), [&s2](auto& kv) { return kv.first == s2;} );
+        if (str[k] == '=') {
+            const int val = str[k + 1] - '0';
+            if (it != mp[h2].end()) {
+                it->second = val;
+            } else {
+                mp[h2].emplace_back(s2, val);
+            }
+        } else if (str[k] == '-' && it != mp[h2].end()) {
+            mp[h2].erase(it);
+        }
+    }
+    for (int i = 0; i < mp.size(); ++i) {
+        for (int j = 0; j < mp[i].size(); ++j) {
+            res[1] += (i + 1) * (j + 1) * mp[i][j].second;
+        }
+    }
+    printf("Res1 = %lld\n", res[0]);
+    printf("Res2 = %lld\n", res[1]);
+}
+//-----------------------------------------------------------------------------
+void day16(utils::FileReader& reader) {
+    int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
     }
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day14(utils::FileReader& reader) {
+void day17(utils::FileReader& reader) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -543,6 +678,7 @@ const std::map<std::string, std::function<void(utils::FileReader&)>> functions =
     { "1", day1 }, { "2", day2 }, { "3", day3 }, { "4", day4 }, { "5", day5 },
     { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
     { "11", day11 }, { "12", day12 }, { "13", day13 }, { "14", day14 },
+    { "15", day15 }, { "16", day16 }, { "17", day17 },
 };
 
 int main(int argc, char **argv)
@@ -552,7 +688,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const std::string day = argc > 1? argv[1]: "13";
+    const std::string day = argc > 1? argv[1]: "15";
     const std::string inputFile = argc > 2? argv[2]: "input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();
