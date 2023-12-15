@@ -12,29 +12,38 @@
 #include <queue>
 #include <memory>
 #include <optional>
+#include <sstream>
+#include <string_view>
 
 namespace utils
 {
 
-// adds string constructor capability to std::exception
+// custom exception
 class MyException : public std::runtime_error
 {
 public:
-    MyException(const std::string &msg) : std::runtime_error(msg.c_str()) {}
+    MyException(const std::string &msg) : std::runtime_error(msg) {}
+
+    template <typename... Args>
+    static MyException make(const char* message, const char *names, Args&&... args);
 };
+
+
 
 
 struct FileReader {
     struct LineReader {
-        LineReader(const std::string& _line) : line(_line) {}
-        const std::string& get() { return line; }
+        LineReader(const std::string_view& _line) : line(_line) {}
+        const std::string_view& get() { return line; }
 
         template<typename... Args>
         bool read(const char* fmt, Args... args);
 
+        std::vector<std::string_view> split(char delim);
+
      private:
-        const std::string& line;
-        int pos = 0;
+        std::string_view line;
+        size_t pos = 0;
     };
 
     FileReader(const std::filesystem::path& fileName);
@@ -56,7 +65,7 @@ struct StringToIdMap {
 
   private:
     std::unordered_map<std::string, int> fwd;
-    std::unordered_map<int, const std::string*> bwd;
+    std::unordered_map<int, const std::string> bwd;
 };
 
 
@@ -71,12 +80,20 @@ void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args);
 } // namespace detail
 
 #define PRINT(...)  utils::detail::print(std::cout, #__VA_ARGS__, __VA_ARGS__)
-
+#define EXCEPTION(msg, ...)  utils::MyException::make(msg, #__VA_ARGS__, __VA_ARGS__)
 
 static constexpr std::initializer_list<std::pair<int, int>> DIR4 = {{-1,0}, {0,-1}, {1, 0}, {0, 1}};
 static constexpr std::initializer_list<std::pair<int, int>> DIR9 = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1, 0}, {1,1}, {0, 1}, {-1,1}};
 
 //-----------------------------------------------------------------------------
+
+template <typename... Args>
+MyException MyException::make(const char* message, const char *names, Args&&... args) {
+    std::stringstream ss;
+    ss << message << "\nDetails:\n";
+    detail::print(ss, names, std::forward<Args>(args)...);
+    return MyException(ss.str());
+}
 
 template<typename... Args>
 bool FileReader::LineReader::read(const char* fmt, Args... args) {
@@ -92,12 +109,12 @@ bool FileReader::LineReader::read(const char* fmt, Args... args) {
 namespace detail
 {
 
-const char* print_name(std::ostream& os, const char* p);
+void printNextName(std::ostream& os, const char*& p);
 
 template <typename Arg, typename... Args>
-void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args) {
-    nl = print_name(os, nl); os << std::forward<Arg>(arg) << "\n";
-    ((nl = print_name(os, nl), os << std::forward<Args>(args) << "\n"), ...);
+void print(std::ostream& os, const char* names, Arg&& arg, Args&&... args) {
+    printNextName(os, names); os << std::forward<Arg>(arg) << "\n";
+    ((printNextName(os, names), os << std::forward<Args>(args) << "\n"), ...);
 }
 
 namespace is_stl_container_impl {
@@ -124,6 +141,9 @@ std::ostream& operator<<(std::ostream& os, const Container& c) {
     os << "[";
     for (const auto& el : c) {
         os << el << ", ";
+        if constexpr (detail::is_stl_container<decltype(el)>::value) {
+            os << "\n";
+        }
     }
     os << "]";
     return os;

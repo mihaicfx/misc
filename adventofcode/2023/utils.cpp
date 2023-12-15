@@ -46,18 +46,36 @@ FileReader::LineReader FileReader::getLine() {
     return {line};
 }
 
+std::vector<std::string_view> FileReader::LineReader::split(char delim) {
+    std::vector<std::string_view> res;
+    auto i = pos;
+    for (; i < line.length(); ++i) {
+        if (line[i] == delim) {
+            if (pos != i) {
+                res.emplace_back(line.substr(pos, i - pos));
+            }
+            pos = i + 1;
+        }
+    }
+    if (pos != i) { // last
+        res.emplace_back(line.substr(pos, i - pos));
+        pos = i;
+    }
+    return res;
+}
+
 
 int StringToIdMap::set(std::string s) {
     auto it = fwd.find(s);
     if (it == fwd.end()) {
-        it = fwd.insert(it, {std::move(s), fwd.size() + 1});
+        it = fwd.insert(it, {s, fwd.size() + 1});
     }
-    bwd.insert({it->second, &it->first});
+    bwd.insert({it->second, std::move(s)});
     return it->second;
 }
 
 const std::string& StringToIdMap::get(int id) {
-    return *bwd.at(id);
+    return bwd.at(id);
 }
 
 
@@ -85,7 +103,7 @@ int digits(long long n) {
 namespace detail
 {
 
-const char* print_name(std::ostream& os, const char* p) {
+void printNextName(std::ostream& os, const char*& p) {
     // note: should it handle quotes?
     if (*p) {
         while (isspace(*p)) {
@@ -107,12 +125,11 @@ const char* print_name(std::ostream& os, const char* p) {
         while (end > start && isspace(end[-1])) {
             --end;
         }
-        os << std::string(start, end - start) << " = ";
+        os << std::string_view(start, end - start) << " = ";
         if (*p) {
             ++p;
         }
     }
-    return p;
 }
 
 } // namespace detail

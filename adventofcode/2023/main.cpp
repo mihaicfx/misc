@@ -16,12 +16,13 @@
 #include <array>
 #include <functional>
 #include <numeric>
+#include <cstdint>
 
 #include "utils.h"
 
+static constexpr int PART = 2;
 //-----------------------------------------------------------------------------
 void day1(utils::FileReader& reader) {
-    static constexpr int PART = 2;
     char buf[100];
     int res = 0;
     const std::array<std::string, 9> words = {
@@ -51,7 +52,6 @@ void day1(utils::FileReader& reader) {
 }
 //-----------------------------------------------------------------------------
 void day2(utils::FileReader& reader) {
-    static constexpr int PART = 2;
     int res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -127,7 +127,7 @@ void day3(utils::FileReader& reader) {
         }
     }
     printf("Res part1 = %d\n", res);
-    long long res2 = 0;
+    int64_t res2 = 0;
     for (const auto g : gears) {
         if (g.second.size() == 2) {
             res2 += g.second[0] * g.second[1];
@@ -170,14 +170,13 @@ void day4(utils::FileReader& reader) {
 }
 //-----------------------------------------------------------------------------
 void day5(utils::FileReader& reader) {
-    static constexpr int PART = 2;
-    std::vector<std::pair<long long, long long>> seeds;
+    std::vector<std::pair<int64_t, int64_t>> seeds;
     reader.nextLine();
     auto line = reader.getLine();
     if (!line.read("seeds: ")) {
         throw utils::MyException("error reading seeds");
     }
-    long long seed, range;
+    int64_t seed, range;
     if (PART == 1) {
         while (line.read("%lld", &seed)) {
             seeds.emplace_back(seed, seed + 1);
@@ -189,9 +188,9 @@ void day5(utils::FileReader& reader) {
     }
     reader.nextLine();
     while (reader.nextLine()) {
-        std::vector<std::array<long long, 3>> mp;
+        std::vector<std::array<int64_t, 3>> mp;
         while (reader.nextLine()) {
-            long long a,b,c;
+            int64_t a,b,c;
             if (reader.getLine().read("%lld %lld %lld", &a, &b, &c)) {
                 mp.push_back(std::array{a, b, c});
             } else break;
@@ -226,11 +225,10 @@ void day5(utils::FileReader& reader) {
 }
 //-----------------------------------------------------------------------------
 void day6(utils::FileReader& reader) {
-    static constexpr int PART = 2;
-    long long res = 1;
-    std::vector<long long> timedist[2];
+    int64_t res = 1;
+    std::vector<int64_t> timedist[2];
     for (auto& td : timedist) {
-        long long v = 0;
+        int64_t v = 0;
         reader.nextLine();
         auto line1 = reader.getLine();
         line1.read("%*s");
@@ -244,9 +242,9 @@ void day6(utils::FileReader& reader) {
     }
     const auto& [time, dist] = timedist;
     for (int i = 0; i < time.size(); ++i) {
-        long long n = 0;
+        int64_t n = 0;
         for (int t = 1; t < time[i]; ++t) {
-            long long travel = t * (time[i] - t);
+            int64_t travel = t * (time[i] - t);
             n += travel > dist[i];
         }
         res *= n;
@@ -271,7 +269,6 @@ int day7_score(std::string h, bool part2=false) {
 }
 
 bool day7_compareHand(std::pair<std::string, int>& hand1, std::pair<std::string, int>& hand2) {
-    static constexpr int PART = 2;
     static std::array rv = {'A', 'K', 'Q', PART == 1? 'J': '-', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'};
     int h1 = day7_score(hand1.first, PART == 2);
     int h2 = day7_score(hand2.first, PART == 2);
@@ -285,14 +282,14 @@ bool day7_compareHand(std::pair<std::string, int>& hand1, std::pair<std::string,
 }
 
 void day7(utils::FileReader& reader) {
-    long long res = 0;
+    int64_t res = 0;
     std::vector<std::pair<std::string, int>> hands;
     while (reader.nextLine()) {
         char hand[10];
         int bid = 0;
         auto line = reader.getLine();
         if (!line.read("%5s %d", hand, &bid)) {
-            throw utils::MyException("error reading line " + line.get());
+            throw utils::MyException("error reading line " + std::string{line.get()});
         }
         hands.emplace_back(hand, bid);
     }
@@ -300,13 +297,79 @@ void day7(utils::FileReader& reader) {
     for (int i = 0; i < hands.size(); ++i) {
         const auto& [h,b] = hands[i];
         res += (i + 1) * b;
-        //printf("%s %d = %d\n", h.c_str(), b, day7_score2(h));
     }
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
 void day8(utils::FileReader& reader) {
-    long long res = 0;
+    int64_t res = 0;
+    std::unordered_map<std::string, std::pair<std::string, std::string>> mp;
+    reader.nextLine();
+    const auto lr = std::string{reader.getLine().get()};
+    while (reader.nextLine()) {
+        char node[4], left[4], right[4];
+        if (reader.getLine().read("%3s = (%3s, %3s)", node, left, right)) {
+            mp[node] = std::make_pair<std::string, std::string>(left, right);
+        }
+    }
+    std::vector<const std::string*> starts;
+    const auto checkNode = [](const auto& s, char az) {
+        return PART == 1? s == std::string(3, az): s[2] == az;
+    };
+    for (const auto& [k,v] : mp) {
+        if (checkNode(k, 'A')) {
+            starts.push_back(&k);
+        }
+    }
+    std::vector<int64_t> dist(starts.size(), 0);
+    for (int i = 0; i < starts.size(); ++i) {
+        const auto* node = starts[i];
+        while (!checkNode(*node, 'Z')) {
+            for (char c : lr) {
+                auto& [l,r] = mp[*node];
+                node = c == 'L'? &l: &r;
+            }
+            dist[i] += 1;
+        }
+        //printf("%s: reaches %s in %lld steps\n", starts[i]->c_str(), node->c_str(), dist[i]);
+    }
+    res = 1;
+    for (auto d : dist) {
+        res *= d / std::gcd(res, d);
+    }
+    res *= lr.length();
+
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day9(utils::FileReader& reader) {
+    int64_t res1 = 0, res2 = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        std::vector<int64_t> v;
+        int64_t val = 0;
+        while (line.read("%lld", &val)) {
+            v.push_back(val);
+        }
+        int j = 0;
+        int64_t e1 = 0, e2 = 0;
+        while (std::any_of(v.begin(), v.end(), [](auto x) { return x != 0; })) {
+            e1 += v.back();
+            e2 = e2 + (j % 2? -1: 1) * v[j];
+            for (int i = v.size() - 1; i > j; --i) {
+                v[i] -= v[i - 1];
+            }
+            v[j++] = 0;
+        }
+        PRINT(v, e1, e2);
+        res1 += e1;
+        res2 += e2;
+    }
+    printf("Res1 = %lld, Res2 = %lld\n", res1, res2);
+}
+//-----------------------------------------------------------------------------
+void day10(utils::FileReader& reader) {
+    int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
     }
@@ -315,7 +378,7 @@ void day8(utils::FileReader& reader) {
 //-----------------------------------------------------------------------------
 const std::map<std::string, std::function<void(utils::FileReader&)>> functions = {
     { "1", day1 }, { "2", day2 }, { "3", day3 }, { "4", day4 }, { "5", day5 },
-    { "6", day6 }, { "7", day7 }, { "8", day8 },
+    { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
 };
 
 int main(int argc, char **argv)
