@@ -369,6 +369,169 @@ void day9(utils::FileReader& reader) {
 }
 //-----------------------------------------------------------------------------
 void day10(utils::FileReader& reader) {
+    auto lines = reader.allLines();
+    std::pair<int, int> s{};
+    const int n = lines.size();
+    const int m = lines[0].size();
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] == 'S') {
+                s = {i, j};
+            }
+        }
+    }
+    const auto dirs = [](char c) -> std::array<std::pair<int, int>, 2> {
+        switch (c) {
+            case '|': return {{{-1, 0}, {+1, 0}}}; break;
+            case '-': return {{{0, -1}, {0, +1}}}; break;
+            case 'L': return {{{-1, 0}, {0, +1}}}; break;
+            case 'J': return {{{-1, 0}, {0, -1}}}; break;
+            case '7': return {{{0, -1}, {+1, 0}}}; break;
+            case 'F': return {{{+1, 0}, {0, +1}}}; break;
+        }
+        throw utils::MyException("invalid cell type " + std::to_string(c));
+    };
+    const auto findFirst = [&]() {
+        for (const auto [x, y] : utils::DIR4) {
+            const std::pair<int, int> pos = {s.first + x, s.second + y};
+            for (const auto [dx, dy] : dirs(lines[pos.first][pos.second])) {
+                if (lines[pos.first + dx][pos.second + dy] == 'S') {
+                    return pos;
+                }
+            }
+        }
+        throw utils::MyException("failed to find direction from S");
+    };
+    std::vector<std::pair<int, int>> path;
+    path.push_back(s);
+    s = findFirst();
+    while (lines[s.first][s.second] != 'S') {
+        auto next = dirs(lines[s.first][s.second]);
+        for (const auto [dx, dy] : next) {
+            const std::pair<int, int> pos = {s.first + dx, s.second + dy};
+            if (pos.first >= 0 && pos.first < n && pos.second >= 0 && pos.second < m && path.back() != pos) {
+                path.push_back(s);
+                s = pos;
+                break;
+            }
+        }
+    }
+    printf("Res1 = %d\n", path.size() / 2);
+    // winding number algorithm
+    for (const auto [x, y] : path) {
+        lines[x][y] = strchr("|LJ", lines[x][y])? '$': ' ';
+    }
+    int res2 = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int k = 0, j = 0; j < m; ++j) {
+            if (lines[i][j] == '$') k++;
+            else if (lines[i][j] != ' ' && k % 2) res2++;
+        }
+    }
+    printf("Res2 = %d\n", res2);
+}
+//-----------------------------------------------------------------------------
+void day11(utils::FileReader& reader) {
+    int64_t res = 0;
+    auto lines = reader.allLines();
+    const int n = lines.size();
+    const int m = lines[0].size();
+    std::vector<int> er, ec;
+    for (int i = 0; i < n; ++i) {
+        if (std::all_of(lines[i].begin(), lines[i].end(), [](char x) { return x == '.'; })) {
+            er.push_back(i);
+        }
+    }
+    for (int j = 0; j < m; ++j) {
+        if (std::all_of(lines.begin(), lines.end(), [j](const auto& line) { return line[j] == '.'; })) {
+            ec.push_back(j);
+        }
+    }
+    std::vector<std::pair<int64_t, int64_t>> nodes;
+    constexpr int64_t EXP = 1000000 - 1;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] == '#') {
+                int64_t di = i + EXP * (std::lower_bound(er.begin(), er.end(), i) - er.begin());
+                int64_t dj = j + EXP * (std::lower_bound(ec.begin(), ec.end(), j) - ec.begin());
+                nodes.emplace_back(di, dj);
+                //PRINT(i,j, di, dj);
+            }
+        }
+    }
+    const int mm = nodes.size();
+    for (int i = 0; i < mm; ++i) {
+        for (int j = i + 1; j < mm; ++j) {
+            int64_t dist = std::abs(nodes[i].first - nodes[j].first) + std::abs(nodes[i].second - nodes[j].second);
+            //PRINT(i, j, nodes[i], nodes[j], dist);
+            res += dist;
+        }
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day12(utils::FileReader& reader) {
+    int64_t res = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        char buf[200];
+        if (!line.read("%s", buf)) {
+            throw utils::MyException("failed to read row");
+        }
+        std::vector<int> vs;
+        int v = 0;
+        while (line.read("%d", &v)) {
+            vs.push_back(v);
+            line.read(",");
+        }
+        if (PART == 2) {
+            std::string cp = buf;
+            for (int i = 0; i < 4; ++i) {
+                strcat(buf, "?");
+                strcat(buf, cp.c_str());
+            }
+            for (int n = vs.size(), i = 0; i < 4 * n; ++i) {
+                vs.push_back(vs[i]);
+            }
+        }
+        const int n = strlen(buf);
+        const auto match = [buf](int j, int k) {
+            return (j == 0 || buf[j - 1] != '#') && // no leading #
+                    std::all_of(buf + j, buf + j + k, [](char c) { return c == '?' || c == '#'; }) && // match ? or #
+                    buf[j + k] != '#'; // no trailing #
+        };
+        std::vector<int64_t> dp(n + 2, 0);
+        for (int i = dp.size() - 1; i >= 0 && (i >= n || buf[i] != '#'); --i) {
+            dp[i] = 1;
+        }
+        for (int i = vs.size() - 1; i >= 0; --i) {
+            std::vector<int64_t> dp2(n + 2, 0);
+            int64_t a = 0;
+            for (int j = n - vs[i]; j >= 0; --j) {
+                if (buf[j] == '#') {
+                    a = 0;
+                }
+                if (match(j, vs[i])) {
+                    a += dp[j + vs[i] + 1];
+                }
+                dp2[j] = a;
+            }
+            std::swap(dp2, dp);
+        }
+        res += dp[0];
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day13(utils::FileReader& reader) {
+    int64_t res = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day14(utils::FileReader& reader) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -379,16 +542,17 @@ void day10(utils::FileReader& reader) {
 const std::map<std::string, std::function<void(utils::FileReader&)>> functions = {
     { "1", day1 }, { "2", day2 }, { "3", day3 }, { "4", day4 }, { "5", day5 },
     { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
+    { "11", day11 }, { "12", day12 }, { "13", day13 }, { "14", day14 },
 };
 
 int main(int argc, char **argv)
 {
-    if (argc < 2 || argc > 3) {
-        printf("Invalid arguments. Usage: %s day [input_file]", argv[0]);
+    if (argc > 3) {
+        printf("Invalid arguments. Usage: %s [day [input_file]]", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const std::string day = argv[1];
+    const std::string day = argc > 1? argv[1]: "13";
     const std::string inputFile = argc > 2? argv[2]: "input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();
