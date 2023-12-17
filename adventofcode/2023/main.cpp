@@ -22,9 +22,8 @@
 
 #include "utils.h"
 
-static constexpr int PART = 2;
 //-----------------------------------------------------------------------------
-void day1(utils::FileReader& reader) {
+void day1(utils::FileReader& reader, int part) {
     char buf[100];
     int res = 0;
     const std::array<std::string, 9> words = {
@@ -38,7 +37,7 @@ void day1(utils::FileReader& reader) {
             if (isdigit(buf[i])) {
                 val = buf[i] - '0';
             }
-            if (PART == 2) {
+            if (part == 2) {
                 for (int k = 0; k < words.size(); ++k) {
                     if (strncmp(buf + i, words[k].c_str(), words[k].length()) == 0) {
                         val = k + 1;
@@ -47,13 +46,13 @@ void day1(utils::FileReader& reader) {
             }
             if (val != -1) (a == -1? a: b) = val;
         }
-        printf("%s = %d/%d\n", buf, a, (b == -1? a: b));
+        //printf("%s = %d/%d\n", buf, a, (b == -1? a: b));
         res += a * 10 + (b == -1? a: b);
     }
     printf("Res = %d\n", res);
 }
 //-----------------------------------------------------------------------------
-void day2(utils::FileReader& reader) {
+void day2(utils::FileReader& reader, int part) {
     int res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -75,7 +74,7 @@ void day2(utils::FileReader& reader) {
             }
             rgb[index] = value;
             if (delim != ',') {
-                if (PART == 1) {
+                if (part == 1) {
                     if (rgb[0] > 12 || rgb[1] > 13 || rgb[2] > 14) {
                         gg = false;
                     }
@@ -87,7 +86,7 @@ void day2(utils::FileReader& reader) {
                 std::fill(std::begin(rgb), std::end(rgb), 0);
             }
         }
-        if (PART == 1) {
+        if (part == 1) {
             if (gg) {
                 res += game;
             }
@@ -98,7 +97,7 @@ void day2(utils::FileReader& reader) {
     printf("Res = %d\n", res);
 }
 //-----------------------------------------------------------------------------
-void day3(utils::FileReader& reader) {
+void day3(utils::FileReader& reader, int part) {
     int res = 0;
     std::vector<std::string> m = reader.allLines();
     std::unordered_map<int, std::vector<int>> gears;
@@ -138,7 +137,7 @@ void day3(utils::FileReader& reader) {
     printf("Res part2 = %lld\n", res2);
 }
 //-----------------------------------------------------------------------------
-void day4(utils::FileReader& reader) {
+void day4(utils::FileReader& reader, int part) {
     int res = 0;
     std::array<int, 215> cards{};
     while (reader.nextLine()) {
@@ -171,7 +170,7 @@ void day4(utils::FileReader& reader) {
     printf("Res2 = %d\n", res2);
 }
 //-----------------------------------------------------------------------------
-void day5(utils::FileReader& reader) {
+void day5(utils::FileReader& reader, int part) {
     std::vector<std::pair<int64_t, int64_t>> seeds;
     reader.nextLine();
     auto line = reader.getLine();
@@ -179,7 +178,7 @@ void day5(utils::FileReader& reader) {
         throw utils::MyException("error reading seeds");
     }
     int64_t seed, range;
-    if (PART == 1) {
+    if (part == 1) {
         while (line.read("%lld", &seed)) {
             seeds.emplace_back(seed, seed + 1);
         }
@@ -226,7 +225,7 @@ void day5(utils::FileReader& reader) {
     printf("Res = %lld\n", std::min_element(seeds.begin(), seeds.end())->first);
 }
 //-----------------------------------------------------------------------------
-void day6(utils::FileReader& reader) {
+void day6(utils::FileReader& reader, int part) {
     int64_t res = 1;
     std::vector<int64_t> timedist[2];
     for (auto& td : timedist) {
@@ -235,7 +234,7 @@ void day6(utils::FileReader& reader) {
         auto line1 = reader.getLine();
         line1.read("%*s");
         while (line1.read("%lld", &v)) {
-            if (PART == 1 || td.empty()) {
+            if (part == 1 || td.empty()) {
                 td.push_back(v);
             } else {
                 td.back() = td.back() * std::pow(10, utils::digits(v)) + v;
@@ -272,10 +271,10 @@ int score(std::string h, bool part2=false) {
     return s;
 }
 
-bool compareHand(std::pair<std::string, int>& hand1, std::pair<std::string, int>& hand2) {
-    static std::array rv = {'A', 'K', 'Q', PART == 1? 'J': '-', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'};
-    int h1 = score(hand1.first, PART == 2);
-    int h2 = score(hand2.first, PART == 2);
+bool compareHand(const std::pair<std::string, int>& hand1, const std::pair<std::string, int>& hand2, int part) {
+    static std::array rv = {'A', 'K', 'Q', part == 1? 'J': '-', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'};
+    int h1 = score(hand1.first, part == 2);
+    int h2 = score(hand2.first, part == 2);
     if (h1 != h2) return h1 < h2;
     for (int i = 0; i < hand1.first.length(); ++i) {
         auto i1 = std::find(rv.begin(), rv.end(), hand1.first[i]);
@@ -286,7 +285,7 @@ bool compareHand(std::pair<std::string, int>& hand1, std::pair<std::string, int>
 }
 
 } // namespace day_7
-void day7(utils::FileReader& reader) {
+void day7(utils::FileReader& reader, int part) {
     int64_t res = 0;
     std::vector<std::pair<std::string, int>> hands;
     while (reader.nextLine()) {
@@ -298,7 +297,7 @@ void day7(utils::FileReader& reader) {
         }
         hands.emplace_back(hand, bid);
     }
-    std::sort(hands.begin(), hands.end(), day_7::compareHand);
+    std::sort(hands.begin(), hands.end(), [part](auto& h1, auto& h2) { return day_7::compareHand(h1, h2, part); });
     for (int i = 0; i < hands.size(); ++i) {
         const auto& [h,b] = hands[i];
         res += (i + 1) * b;
@@ -306,7 +305,7 @@ void day7(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day8(utils::FileReader& reader) {
+void day8(utils::FileReader& reader, int part) {
     int64_t res = 0;
     std::unordered_map<std::string, std::pair<std::string, std::string>> mp;
     reader.nextLine();
@@ -318,8 +317,8 @@ void day8(utils::FileReader& reader) {
         }
     }
     std::vector<const std::string*> starts;
-    const auto checkNode = [](const auto& s, char az) {
-        return PART == 1? s == std::string(3, az): s[2] == az;
+    const auto checkNode = [part](const auto& s, char az) {
+        return part == 1? s == std::string(3, az): s[2] == az;
     };
     for (const auto& [k,v] : mp) {
         if (checkNode(k, 'A')) {
@@ -347,7 +346,7 @@ void day8(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day9(utils::FileReader& reader) {
+void day9(utils::FileReader& reader, int part) {
     int64_t res1 = 0, res2 = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -373,7 +372,7 @@ void day9(utils::FileReader& reader) {
     printf("Res1 = %lld, Res2 = %lld\n", res1, res2);
 }
 //-----------------------------------------------------------------------------
-void day10(utils::FileReader& reader) {
+void day10(utils::FileReader& reader, int part) {
     auto lines = reader.allLines();
     std::pair<int, int> s{};
     const int n = lines.size();
@@ -436,7 +435,7 @@ void day10(utils::FileReader& reader) {
     printf("Res2 = %d\n", res2);
 }
 //-----------------------------------------------------------------------------
-void day11(utils::FileReader& reader) {
+void day11(utils::FileReader& reader, int part) {
     int64_t res = 0;
     auto lines = reader.allLines();
     const int n = lines.size();
@@ -453,7 +452,7 @@ void day11(utils::FileReader& reader) {
         }
     }
     std::vector<std::pair<int64_t, int64_t>> nodes;
-    constexpr int64_t EXP = 1000000 - 1;
+    const int64_t EXP = part == 1? 2: 1000000 - 1;
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             if (lines[i][j] == '#') {
@@ -475,7 +474,7 @@ void day11(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day12(utils::FileReader& reader) {
+void day12(utils::FileReader& reader, int part) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -489,7 +488,7 @@ void day12(utils::FileReader& reader) {
             vs.push_back(v);
             line.read(",");
         }
-        if (PART == 2) {
+        if (part == 2) {
             std::string cp = buf;
             for (int i = 0; i < 4; ++i) {
                 strcat(buf, "?");
@@ -528,7 +527,7 @@ void day12(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day13(utils::FileReader& reader) {
+void day13(utils::FileReader& reader, int part) {
     int64_t res = 0;
     auto lines = reader.allLines();
     int s = 0;
@@ -542,7 +541,7 @@ void day13(utils::FileReader& reader) {
                         diff += lines[j][k - d - 1] != lines[j][k + d];
                     }
                 }
-                if (diff == PART - 1) {
+                if (diff == part - 1) {
                     res += k;
                     break;
                 }
@@ -555,7 +554,7 @@ void day13(utils::FileReader& reader) {
                         diff += lines[k - d - 1][j] != lines[k + d][j];
                     }
                 }
-                if (diff == PART - 1) {
+                if (diff == part - 1) {
                     res += (k - s) * 100;
                     break;
                 }
@@ -588,12 +587,12 @@ void roll4(std::vector<std::string>& lines, int n, int m) {
 }
 
 } // namespace day_15
-void day14(utils::FileReader& reader) {
+void day14(utils::FileReader& reader, int part) {
     int64_t res = 0;
     auto lines = reader.allLines();
     const int n = lines.size();
     const int m = lines[0].size();
-    if (PART == 1) {
+    if (part == 1) {
         day_14::roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
     } else {
         // generic tortoise and hare algorithm revealed that the cycle starts very soon (< 100 iterations), so we can brute check
@@ -626,7 +625,7 @@ void day14(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day15(utils::FileReader& reader) {
+void day15(utils::FileReader& reader, int part) {
     int64_t res[2] = {};
     if (!reader.nextLine()) {
         throw utils::MyException("failed to read file");
@@ -711,12 +710,12 @@ int go(std::vector<std::string> lines, int n, int m, const utils::Coord start, c
 }
 
 } // namespace day_16
-void day16(utils::FileReader& reader) {
+void day16(utils::FileReader& reader, int part) {
     int res = 0;
     auto lines = reader.allLines();
     const int n = lines.size();
     const int m = lines[0].size();
-    if (PART == 1) {
+    if (part == 1) {
         res = day_16::go(lines, n, m, {0,-1}, utils::dir::R);
     } else {
         for (int i = 0; i < n; ++i) {
@@ -731,7 +730,7 @@ void day16(utils::FileReader& reader) {
     printf("Res = %d\n", res);
 }
 //-----------------------------------------------------------------------------
-void day17(utils::FileReader& reader) {
+void day17(utils::FileReader& reader, int part) {
     int64_t res = 0;
     auto lines = reader.allLines();
     const int n = lines.size();
@@ -743,6 +742,7 @@ void day17(utils::FileReader& reader) {
     q.push({-d0, {-1, 0}, {utils::dir::R}});
     q.push({-d0, {0, -1}, {utils::dir::D}});
     const utils::Coord dest = {n - 1, m - 1};
+    const auto [ks, ke] = (part == 1)? std::pair{1, 3}: std::pair{4, 10};
     while (!q.empty()) { // dijkstra
         auto [dist, pos, dir] = q.top();
         q.pop();
@@ -756,7 +756,6 @@ void day17(utils::FileReader& reader) {
         for (auto nd : {utils::Dir{-dir.j, -dir.i}, utils::Dir{dir.j, dir.i}}) {
             auto np = pos;
             int cd = 0;
-            auto [ks, ke] = (PART == 1)? std::pair{1, 3}: std::pair{4, 10};
             for (int k = 1; k <= ke; ++k) {
                 np = np + nd;
                 if (!(np.i >= 0 && np.i < n && np.j >= 0 && np.j < m)) {
@@ -780,7 +779,7 @@ void day17(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day18(utils::FileReader& reader) {
+void day18(utils::FileReader& reader, int part) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -788,7 +787,7 @@ void day18(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day19(utils::FileReader& reader) {
+void day19(utils::FileReader& reader, int part) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -796,7 +795,7 @@ void day19(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-const std::map<std::string, std::function<void(utils::FileReader&)>> functions = {
+const std::map<std::string, std::function<void(utils::FileReader&, int)>> functions = {
     { "1", day1 }, { "2", day2 }, { "3", day3 }, { "4", day4 }, { "5", day5 },
     { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
     { "11", day11 }, { "12", day12 }, { "13", day13 }, { "14", day14 },
@@ -807,18 +806,19 @@ const std::map<std::string, std::function<void(utils::FileReader&)>> functions =
 int main(int argc, char **argv)
 {
     if (argc > 3) {
-        printf("Invalid arguments. Usage: %s [day [input_file]]", argv[0]);
+        printf("Invalid arguments. Usage: %s [day [part [input_file]]]", argv[0]);
         return EXIT_FAILURE;
     }
 
     const std::string day = argc > 1? argv[1]: "18";
-    const std::string inputFile = argc > 2? argv[2]: "input" + day + ".txt";
+    const int part = argc > 2? atoi(argv[2]): 1;
+    const std::string inputFile = argc > 3? argv[3]: "input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();
 
     try {
         auto reader = utils::FileReader("data/" + inputFile);
-        functions.at(day)(reader);
+        functions.at(day)(reader, part);
     }
     catch (std::exception &ex) {
         printf("Exception caught: %s\n", ex.what());
