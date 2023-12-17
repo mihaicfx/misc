@@ -17,6 +17,8 @@
 #include <functional>
 #include <numeric>
 #include <cstdint>
+#include <unordered_set>
+#include <unordered_map>
 
 #include "utils.h"
 
@@ -252,7 +254,9 @@ void day6(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-int day7_score(std::string h, bool part2=false) {
+namespace day_7
+{
+int score(std::string h, bool part2=false) {
     std::sort(h.begin(), h.end());
     int s = 0, n = 1;
     int j = 0, mn = 0;
@@ -268,10 +272,10 @@ int day7_score(std::string h, bool part2=false) {
     return s;
 }
 
-bool day7_compareHand(std::pair<std::string, int>& hand1, std::pair<std::string, int>& hand2) {
+bool compareHand(std::pair<std::string, int>& hand1, std::pair<std::string, int>& hand2) {
     static std::array rv = {'A', 'K', 'Q', PART == 1? 'J': '-', 'T', '9', '8', '7', '6', '5', '4', '3', '2', 'J'};
-    int h1 = day7_score(hand1.first, PART == 2);
-    int h2 = day7_score(hand2.first, PART == 2);
+    int h1 = score(hand1.first, PART == 2);
+    int h2 = score(hand2.first, PART == 2);
     if (h1 != h2) return h1 < h2;
     for (int i = 0; i < hand1.first.length(); ++i) {
         auto i1 = std::find(rv.begin(), rv.end(), hand1.first[i]);
@@ -281,6 +285,7 @@ bool day7_compareHand(std::pair<std::string, int>& hand1, std::pair<std::string,
     return false;
 }
 
+} // namespace day_7
 void day7(utils::FileReader& reader) {
     int64_t res = 0;
     std::vector<std::pair<std::string, int>> hands;
@@ -293,7 +298,7 @@ void day7(utils::FileReader& reader) {
         }
         hands.emplace_back(hand, bid);
     }
-    std::sort(hands.begin(), hands.end(), day7_compareHand);
+    std::sort(hands.begin(), hands.end(), day_7::compareHand);
     for (int i = 0; i < hands.size(); ++i) {
         const auto& [h,b] = hands[i];
         res += (i + 1) * b;
@@ -392,7 +397,7 @@ void day10(utils::FileReader& reader) {
         throw utils::MyException("invalid cell type " + std::to_string(c));
     };
     const auto findFirst = [&]() {
-        for (const auto [x, y] : utils::DIR4) {
+        for (const auto [x, y] : utils::dir::UDLR) {
             const std::pair<int, int> pos = {s.first + x, s.second + y};
             for (const auto [dx, dy] : dirs(lines[pos.first][pos.second])) {
                 if (lines[pos.first + dx][pos.second + dy] == 'S') {
@@ -561,7 +566,9 @@ void day13(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day14_roll(int n, int m, const std::function<char&(int,int)>& getter) {
+namespace day_14
+{
+void roll(int n, int m, const std::function<char&(int,int)>& getter) {
     for (int j = 0; j < m; ++j) {
         int p = 0;
         for (int i = 0; i < n; ++i) {
@@ -573,27 +580,28 @@ void day14_roll(int n, int m, const std::function<char&(int,int)>& getter) {
     }
 }
 
-void day14_roll4(std::vector<std::string>& lines, int n, int m) {
-    day14_roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
-    day14_roll(m, n, [&](int i, int j) -> char& { return lines[j][i]; });
-    day14_roll(n, m, [&](int i, int j) -> char& { return lines[n - i - 1][j]; });
-    day14_roll(m, n, [&](int i, int j) -> char& { return lines[j][n - i - 1]; });
+void roll4(std::vector<std::string>& lines, int n, int m) {
+    roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
+    roll(m, n, [&](int i, int j) -> char& { return lines[j][i]; });
+    roll(n, m, [&](int i, int j) -> char& { return lines[n - i - 1][j]; });
+    roll(m, n, [&](int i, int j) -> char& { return lines[j][n - i - 1]; });
 }
 
+} // namespace day_15
 void day14(utils::FileReader& reader) {
     int64_t res = 0;
     auto lines = reader.allLines();
     const int n = lines.size();
     const int m = lines[0].size();
     if (PART == 1) {
-        day14_roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
+        day_14::roll(n, m, [&](int i, int j) -> char& { return lines[i][j]; });
     } else {
         // generic tortoise and hare algorithm revealed that the cycle starts very soon (< 100 iterations), so we can brute check
         auto lines1 = lines;
         std::vector<std::vector<std::string>> alllines;
         std::pair<int, int> found = {-1,-1};
         for (int i = 0; found.first == -1; ++i) {
-            day14_roll4(lines1, n, m);
+            day_14::roll4(lines1, n, m);
             for (int j = 0; j < i; ++j) {
                 if (lines1 == alllines[j]) {
                     found = {j + 1, i + 1};
@@ -604,7 +612,7 @@ void day14(utils::FileReader& reader) {
         }
         PRINT(found);
         for (int i = 0; i < found.first + ((1'000'000'000 - found.second) % (found.second - found.first)); ++i) {
-            day14_roll4(lines, n, m);
+            day_14::roll4(lines, n, m);
         }
     }
     // score
@@ -658,7 +666,121 @@ void day15(utils::FileReader& reader) {
     printf("Res2 = %lld\n", res[1]);
 }
 //-----------------------------------------------------------------------------
+namespace day_16
+{
+int go(std::vector<std::string> lines, int n, int m, const utils::Coord start, const utils::Dir dir) {
+    std::queue<std::pair<utils::Coord, utils::Dir>> q;
+    std::unordered_set<std::pair<utils::Coord, utils::Dir>> vis(m * n);
+    std::unordered_set<utils::Coord> locations(m * n);
+    q.push({start, dir});
+    while (!q.empty()) { // bfs
+        auto [p, d] = q.front();
+        q.pop();
+        if (vis.count({p, d}) != 0) {
+            continue;
+        }
+        vis.insert({p, d});
+        locations.insert(p);
+        const auto np = p + d;
+        if (np.i >= 0 && np.i < n && np.j >= 0 && np.j < m) {
+            switch (lines[np.i][np.j]) {
+                case '.' : break; // go on
+                case '|' :
+                    if (d.i == 0) { // split
+                        q.push({np, utils::dir::U});
+                        d = utils::dir::D;
+                    } // else go on
+                    break;
+                case '-' :
+                    if (d.j == 0) { // split
+                        q.push({np, utils::dir::L});
+                        d = utils::dir::R;
+                    } // else go on
+                    break;
+                case '/' :
+                    d = utils::Dir{-d.j, -d.i};
+                    break;
+                case '\\' :
+                    d = utils::Dir{d.j, d.i};
+                    break;
+            }
+            q.push({np, d});
+        }
+    }
+    return locations.size() - 1;
+}
+
+} // namespace day_16
 void day16(utils::FileReader& reader) {
+    int res = 0;
+    auto lines = reader.allLines();
+    const int n = lines.size();
+    const int m = lines[0].size();
+    if (PART == 1) {
+        res = day_16::go(lines, n, m, {0,-1}, utils::dir::R);
+    } else {
+        for (int i = 0; i < n; ++i) {
+            res = std::max(res, day_16::go(lines, n, m, {i,-1}, utils::dir::R));
+            res = std::max(res, day_16::go(lines, n, m, {i, m}, utils::dir::L));
+        }
+        for (int j = 0; j < m; ++j) {
+            res = std::max(res, day_16::go(lines, n, m, {-1, j}, utils::dir::D));
+            res = std::max(res, day_16::go(lines, n, m, { n, j}, utils::dir::U));
+        }
+    }
+    printf("Res = %d\n", res);
+}
+//-----------------------------------------------------------------------------
+void day17(utils::FileReader& reader) {
+    int64_t res = 0;
+    auto lines = reader.allLines();
+    const int n = lines.size();
+    const int m = lines[0].size();
+    using T3 = std::tuple<int, utils::Coord, utils::Dir>;
+    std::priority_queue<T3, std::vector<T3>, std::greater<T3>> q;
+    std::unordered_map<std::pair<utils::Coord, utils::Dir>, int> vis;
+    const int d0 = lines[0][0] - '0';
+    q.push({-d0, {-1, 0}, {utils::dir::R}});
+    q.push({-d0, {0, -1}, {utils::dir::D}});
+    const utils::Coord dest = {n - 1, m - 1};
+    while (!q.empty()) { // dijkstra
+        auto [dist, pos, dir] = q.top();
+        q.pop();
+        if (pos == dest) {
+            res = dist;
+            break;
+        }
+        if (auto it = vis.find({pos, dir}); it != vis.end() && dist > it->second) {
+            continue;
+        }
+        for (auto nd : {utils::Dir{-dir.j, -dir.i}, utils::Dir{dir.j, dir.i}}) {
+            auto np = pos;
+            int cd = 0;
+            auto [ks, ke] = (PART == 1)? std::pair{1, 3}: std::pair{4, 10};
+            for (int k = 1; k <= ke; ++k) {
+                np = np + nd;
+                if (!(np.i >= 0 && np.i < n && np.j >= 0 && np.j < m)) {
+                    continue;
+                }
+                cd += lines[np.i][np.j] - '0';
+                if (k < ks) {
+                    continue;
+                }
+                if (auto it = vis.find({np, nd}); it == vis.end() || dist + cd < it->second) {
+                    q.push({dist + cd, np, nd});
+                    if (it == vis.end()) {
+                        vis.insert({{np, nd}, dist + cd});
+                    } else {
+                        it->second = dist + cd;
+                    }
+                }
+            }
+        }
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day18(utils::FileReader& reader) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -666,7 +788,7 @@ void day16(utils::FileReader& reader) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day17(utils::FileReader& reader) {
+void day19(utils::FileReader& reader) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -678,7 +800,8 @@ const std::map<std::string, std::function<void(utils::FileReader&)>> functions =
     { "1", day1 }, { "2", day2 }, { "3", day3 }, { "4", day4 }, { "5", day5 },
     { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
     { "11", day11 }, { "12", day12 }, { "13", day13 }, { "14", day14 },
-    { "15", day15 }, { "16", day16 }, { "17", day17 },
+    { "15", day15 }, { "16", day16 }, { "17", day17 }, { "18", day18 },
+    { "19", day19 },
 };
 
 int main(int argc, char **argv)
@@ -688,7 +811,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const std::string day = argc > 1? argv[1]: "15";
+    const std::string day = argc > 1? argv[1]: "18";
     const std::string inputFile = argc > 2? argv[2]: "input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();
