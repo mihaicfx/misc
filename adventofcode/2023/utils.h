@@ -2,18 +2,16 @@
 
 #include <exception>
 #include <string>
-#include <ctime>
+#include <string_view>
 #include <vector>
 #include <filesystem>
 #include <unordered_map>
 #include <map>
 #include <set>
-#include <stack>
 #include <queue>
 #include <memory>
-#include <optional>
 #include <sstream>
-#include <string_view>
+#include <array>
 
 namespace utils
 {
@@ -75,15 +73,43 @@ int digits(long long n);
 
 namespace detail
 {
+
 template <typename Arg, typename... Args>
 void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args);
+
+template <typename T>
+struct Coord2T {
+    T i, j;
+    constexpr Coord2T() : i{0}, j{0} {}
+    constexpr Coord2T(T _i, T _j) :  i{_i}, j{_j} {}
+
+    constexpr Coord2T operator+(const Coord2T& o) const {
+        return {i + o.i, j + o.j};
+    }
+    constexpr bool operator==(const Coord2T& o) const {
+        return i == o.i && j == o.j;
+    }
+    constexpr bool operator<(const Coord2T& o) const {
+        return i < o.i || (i == o.i && j < o.j);
+    }
+};
+
 } // namespace detail
 
 #define PRINT(...)  utils::detail::print(std::cout, #__VA_ARGS__, __VA_ARGS__)
 #define EXCEPTION(msg, ...)  utils::MyException::make(msg, #__VA_ARGS__, __VA_ARGS__)
 
-static constexpr std::initializer_list<std::pair<int, int>> DIR4 = {{-1,0}, {0,-1}, {1, 0}, {0, 1}};
-static constexpr std::initializer_list<std::pair<int, int>> DIR9 = {{-1,0}, {-1,-1}, {0,-1}, {1,-1}, {1, 0}, {1,1}, {0, 1}, {-1,1}};
+using Coord = detail::Coord2T<int>;
+using Dir = detail::Coord2T<int>;
+
+namespace dir {
+    static constexpr Dir U = {-1, 0};
+    static constexpr Dir D = { 1, 0};
+    static constexpr Dir L = { 0,-1};
+    static constexpr Dir R = { 0, 1};
+    static constexpr std::array<Dir, 4> UDLR = {U, D, L, R};
+    static constexpr std::array<Dir, 8> ALL8 = {U, U+L, U+R, D, D+L, D+R, L, R};
+};
 
 //-----------------------------------------------------------------------------
 
@@ -133,6 +159,11 @@ template <typename T> struct is_stl_container {
   static constexpr bool const value = is_stl_container_impl::is_stl_container<std::decay_t<T>>::value;
 };
 
+inline std::size_t hash_combine(std::size_t seed, std::size_t val)
+{
+    return seed ^ (val + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
 } // namespace detail
 
 
@@ -155,4 +186,25 @@ std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& p) {
     return os;
 }
 
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const detail::Coord2T<T>& p) {
+    os << "(" << p.i << ", " << p.j << ")";
+    return os;
+}
+
 } // namespace utils
+
+template <typename T, typename U>
+struct std::hash<std::pair<T, U>> {
+    size_t operator()(const std::pair<T, U> & x) const {
+        return utils::detail::hash_combine(hash<T>()(x.first), hash<U>()(x.second));
+    }
+};
+
+template <typename T>
+struct std::hash<utils::detail::Coord2T<T>> {
+    size_t operator()(const utils::detail::Coord2T<T> & x) const {
+        std::pair pair = {x.i, x.j};
+        return hash<decltype(pair)>()({x.i, x.j});
+    }
+};
