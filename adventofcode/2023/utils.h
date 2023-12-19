@@ -12,6 +12,7 @@
 #include <memory>
 #include <sstream>
 #include <array>
+#include <functional>
 
 namespace utils
 {
@@ -32,7 +33,7 @@ public:
 struct FileReader {
     struct LineReader {
         LineReader(const std::string_view& _line) : line(_line) {}
-        const std::string_view& get() { return line; }
+        const std::string_view get() { return line.substr(pos); }
 
         template<typename... Args>
         bool read(const char* fmt, Args... args);
@@ -67,7 +68,9 @@ struct StringToIdMap {
 };
 
 
-inline std::vector<std::pair<int, int>> splitWork(int size);
+std::vector<std::pair<int, int>> splitWork(int size);
+
+void runWorkParallel(int size, std::function<void(int start, int end)> worker);
 
 int digits(long long n);
 
@@ -85,6 +88,9 @@ struct Coord2T {
 
     constexpr Coord2T operator+(const Coord2T& o) const {
         return {i + o.i, j + o.j};
+    }
+    constexpr Coord2T operator*(int factor) const {
+        return {i * factor, j * factor};
     }
     constexpr bool operator==(const Coord2T& o) const {
         return i == o.i && j == o.j;
@@ -109,6 +115,7 @@ namespace dir {
     static constexpr Dir R = { 0, 1};
     static constexpr std::array<Dir, 4> UDLR = {U, D, L, R};
     static constexpr std::array<Dir, 8> ALL8 = {U, U+L, U+R, D, D+L, D+R, L, R};
+    const std::map<char, utils::Dir> char2Dir = { {'R', R}, {'D', D}, {'L', L}, {'U', U}};
 };
 
 //-----------------------------------------------------------------------------
@@ -189,6 +196,17 @@ std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& p) {
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const detail::Coord2T<T>& p) {
     os << "(" << p.i << ", " << p.j << ")";
+    return os;
+}
+
+// std::ostream& operator<<(std::ostream& os, const Dir& d) {
+//     os << "UDLR?"[std::min(d.i * 2 + d.j, 4)];
+//     return os;
+// }
+
+template <typename... Args>
+std::ostream& operator<<(std::ostream& os, const std::tuple<Args...>& t) {
+    os << "(" << "tuple: todo" << ")";
     return os;
 }
 

@@ -94,6 +94,18 @@ std::vector<std::pair<int, int>> splitWork(int size)
     return result;
 }
 
+void runWorkParallel(int size, std::function<void(int start, int end)> worker) {
+    auto split = utils::splitWork(size);
+    std::vector<std::thread> threads;
+    threads.reserve(split.size());
+    for (const auto [start, end] : split) {
+        threads.push_back(std::thread(worker, start, end));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+}
+
 int digits(long long n) {
     int res = 0;
     while (n > 0) res++, n /= 10;
