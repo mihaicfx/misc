@@ -809,7 +809,6 @@ void day18(utils::FileReader& reader, int part) {
     res = std::abs(area) + length/2 + 1;
     printf("Res = %lld\n", res);
 }
-} // empty namespace for folding
 //-----------------------------------------------------------------------------
 void day19(utils::FileReader& reader, int part) {
     int64_t res = 0;
@@ -879,8 +878,209 @@ void day19(utils::FileReader& reader, int part) {
     }
     printf("Res = %lld\n", res);
 }
+} // empty namespace for folding
 //-----------------------------------------------------------------------------
 void day20(utils::FileReader& reader, int part) {
+    utils::StringToIdMap sid;
+    std::array<std::pair<char, std::vector<int>>, 64> mp = {}; // {type, receivers}
+    std::array<int64_t, 64> vals = {}, masks = {};
+    std::array<int, 64> sends[2] = {};
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        char but[16];
+        if (!line.read("%16s -> ", but)) throw utils::MyException("failed to read " + std::string{line.get()});
+        const int id = sid.set(but + 1);
+        auto& [type, dest] = mp[id];
+        type = but[0];
+        while (line.read("%16[a-z]", but)) {
+            line.read(", ");
+            dest.push_back(sid.set(but));
+            masks[sid.get(but)] |= 1ll << id;
+        }
+    }
+    int64_t pulses[2] = {};
+    auto push = [&](int time) {
+        std::queue<std::tuple<int, int, bool>> q;
+        q.push({sid.get("roadcaster"), 0, false}); // b has been taken as type
+        while (!q.empty()) {
+            const auto [b, src, pulse] = q.front();
+            q.pop();
+            pulses[pulse]++;
+            const auto& [type, dest] = mp[b];
+            auto& val = vals[b];
+            bool send = pulse;
+            if (type == '%') {
+                if (pulse) {
+                    continue;
+                }
+                send = val = !val;
+            } else if (type == '&') {
+                val = (val & ~(1ll << src)) | (static_cast<int64_t>(pulse) << src);
+                send = val != masks[b];
+            }
+            for (auto d : dest) {
+                q.push({d, b, send});
+            }
+            sends[send][b] = time;
+        }
+    };
+    if (part == 1) {
+        for (int i = 0; i < 1000; ++i) {
+            push(i);
+        }
+        printf("Res1 = %lld\n", pulses[0] * pulses[1]);
+    } else if (part == 2) {
+        // based on observation of the target, we can solve this by finding the last group of inputs that contribute to rx
+        std::vector<int> targets{sid.get("rx")};
+        while (targets.size() == 1) {
+            const int tid = targets.back();
+            targets.pop_back();
+            for (int i = 0; i < mp.size(); ++i) {
+                if (std::find(mp[i].second.begin(), mp[i].second.end(), tid) != mp[i].second.end()) {
+                    targets.push_back(i);
+                }
+            }
+        }
+        std::array<int, 64> loops{};
+        for (int i = 1; std::any_of(targets.begin(), targets.end(), [&loops](int id) { return loops[id] == 0;}); ++i) {
+            push(i);
+            for (int j = 1; j <= loops.size(); ++j) {
+                if (loops[j] == 0 && sends[1][j] == i) {
+                    loops[j] = i;
+                }
+            }
+        }
+        int64_t res = std::accumulate(targets.begin(), targets.end(), 1ll, [&loops](int64_t r, int id) { return r * loops[id];});
+        printf("Res2 = %lld\n", res);
+    }
+}
+//-----------------------------------------------------------------------------
+void day21(utils::FileReader& reader, int part) {
+    int64_t res = 0;
+    auto lines = reader.allLines();
+    const int n = lines.size();
+    const int m = lines[0].size();
+    utils::Coord start = [&]() {
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] == 'S') {
+                    return utils::Coord{i, j};
+            }
+        }
+    }
+        return utils::Coord{};
+    }();
+    lines[start.i][start.j] = '.';
+    std::queue<utils::Coord> q;
+    std::unordered_set<utils::Coord> vis;
+    std::map<utils::Coord, int> counts;
+    const int steps = part == 1? 64: 26'501'365;
+    const int reduced_steps = steps < 3 * n? steps: 2 * n + (steps % n); // don't perform too many steps
+    q.push(start);
+    int step = 0, qsize = 1;
+    auto div_floor = [](int n, int d) { return n >= 0 ? n / d : (n + 1) / d - 1; };
+    while (!q.empty() && step < reduced_steps) {
+        auto pos = q.front();
+        q.pop();
+        for (auto dir : utils::dir::UDLR) {
+            auto p = pos + dir;
+            if (lines[((p.i % n) + n) % n][((p.j % m) + m) % m] == '.' && vis.count(p) == 0) {
+                q.push(p);
+                vis.insert(p);
+                if ((step ^ reduced_steps) & 1) {
+                    counts[{div_floor(p.i, n), div_floor(p.j, m)}]++;
+                    res++;
+                }
+            }
+        }
+        if (--qsize == 0) {
+            step++;
+            qsize = q.size();
+        }
+    }
+    if (reduced_steps < steps) {
+        // generally, the shape will be a diamon with interior fixed pattern and same margins at step mod n
+        // formula observed on the current input. on the general case, it could require more terms/iterations
+        const int64_t N = steps / n;
+        res = N * N * counts[{0,1}] + (N-1)*(N-1) * counts[{0,0}]; // interior
+        for (auto d : utils::dir::UDLR) {
+            res += counts[d * 2]; // diamond corners
+        }
+        res += (N - 1) * (counts[{-1,-1}] + counts[{-1,1}] + counts[{1,-1}] + counts[{1,1}]); // edges
+        res += N * (counts[{-2,-1}] + counts[{-2,1}] + counts[{2,-1}] + counts[{2,1}]); // edges
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day22(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
+    int64_t res1 = 0, res2 = 0;
+    using Brick = std::array<std::array<int, 3>, 2>;
+    std::vector<Brick> bks;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        Brick b = {};
+        if (!line.read("%d,%d,%d~%d,%d,%d", &b[0][0], &b[0][1], &b[0][2], &b[1][0], &b[1][1], &b[1][2])) {
+            throw utils::MyException("failed to read " + std::string{line.get()});
+        }
+        bks.push_back(b);
+    }
+    const auto touches = [](const Brick& b, const Brick& bs) {
+        const auto inbetw = [](int a, int b, int c, int d) { return a <= d && b >= c; };
+        if (b[0][2] == bs[1][2] + 1 &&
+            inbetw(b[0][0], b[1][0], bs[0][0], bs[1][0]) && inbetw(b[0][1], b[1][1], bs[0][1], bs[1][1])) {
+                return true;
+        }
+        return false;
+    };
+    std::sort(bks.begin(), bks.end(), [](const Brick& b1, const Brick& b2) { return b1[0][2] < b2[0][2]; });
+    std::vector<bool> support(bks.size(), false);
+    std::vector<std::vector<int>> suppby(bks.size());
+    std::vector<std::vector<int>> suppwho(bks.size());
+    for (int i = 0; i < bks.size(); ++i) {
+        auto& b = bks[i];
+        int supported = false;
+        while (!supported && b[0][2] > 1) {
+            for (int j = 0; j < i; ++j) {
+                if (touches(b, bks[j])) {
+                    suppwho[j].push_back(i);
+                    suppby[i].push_back(j);
+                    supported++;
+                }
+            }
+            if (!supported) {
+                b[0][2]--;
+                b[1][2]--;
+            } else if (supported == 1) {
+                support[suppby[i].front()] = true;
+            }
+        }
+    }
+    res1 = std::count(support.begin(), support.end(), false);
+    printf("Res1 = %lld\n", res1);
+    for (int i = 0; i < suppwho.size(); ++i) {
+        if (suppwho[i].empty()) continue;
+        std::vector<bool> vis(bks.size(), false);
+        std::queue<int> q;
+        q.push(i);
+        vis[i] = true;
+        while (!q.empty()) {
+            int b = q.front();
+            q.pop();
+            for (int x : suppwho[b]) {
+                if (!vis[x] &&
+                    std::all_of(suppby[x].begin(), suppby[x].end(), [&vis](int k) { return vis[k] == true; })) {
+                        q.push(x);
+                        vis[x] = true;
+                }
+            }
+        }
+        res2 += std::count(vis.begin(), vis.end(), true) - 1;
+    }
+    printf("Res2 = %lld\n", res2);
+}
+//-----------------------------------------------------------------------------
+void day23(utils::FileReader& reader, int part) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -888,7 +1088,15 @@ void day20(utils::FileReader& reader, int part) {
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
-void day21(utils::FileReader& reader, int part) {
+void day24(utils::FileReader& reader, int part) {
+    int64_t res = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+void day25(utils::FileReader& reader, int part) {
     int64_t res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -901,7 +1109,8 @@ const std::map<std::string, std::function<void(utils::FileReader&, int)>> functi
     { "6", day6 }, { "7", day7 }, { "8", day8 }, { "9", day9 }, { "10", day10 },
     { "11", day11 }, { "12", day12 }, { "13", day13 }, { "14", day14 },
     { "15", day15 }, { "16", day16 }, { "17", day17 }, { "18", day18 },
-    { "19", day19 }, { "20", day20 }, { "21", day21 },
+    { "19", day19 }, { "20", day20 }, { "21", day21 }, { "22", day22 },
+    { "23", day23 }, { "24", day24 }, { "25", day25 },
 };
 
 int main(int argc, char **argv)
@@ -911,7 +1120,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const std::string day = strcmp(argv[1], "last")? argv[1]: "19";
+    const std::string day = strcmp(argv[1], "last")? argv[1]: "22";
     const int part = argc > 2? atoi(argv[2]): 1;
     const std::string inputFile = argc > 3? argv[3]: "input" + day + ".txt";
 

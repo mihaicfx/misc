@@ -61,6 +61,7 @@ struct FileReader {
 struct StringToIdMap {
     int set(std::string s);
     const std::string& get(int id);
+    int get(const std::string& s) { return fwd.at(s); }
 
   private:
     std::unordered_map<std::string, int> fwd;
@@ -179,7 +180,7 @@ std::ostream& operator<<(std::ostream& os, const Container& c) {
     os << "[";
     for (const auto& el : c) {
         os << el << ", ";
-        if constexpr (detail::is_stl_container<decltype(el)>::value) {
+        if constexpr (detail::is_stl_container<decltype(el)>::value || std::is_same_v<decltype(el), std::string>) {
             os << "\n";
         }
     }
