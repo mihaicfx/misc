@@ -100,6 +100,7 @@ void day2(utils::FileReader& reader, int part) {
 }
 //-----------------------------------------------------------------------------
 void day3(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
     int res = 0;
     std::vector<std::string> m = reader.allLines();
     std::unordered_map<int, std::vector<int>> gears;
@@ -140,6 +141,7 @@ void day3(utils::FileReader& reader, int part) {
 }
 //-----------------------------------------------------------------------------
 void day4(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
     int res = 0;
     std::array<int, 215> cards{};
     while (reader.nextLine()) {
@@ -346,6 +348,7 @@ void day8(utils::FileReader& reader, int part) {
 }
 //-----------------------------------------------------------------------------
 void day9(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
     int64_t res1 = 0, res2 = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -364,7 +367,7 @@ void day9(utils::FileReader& reader, int part) {
             }
             v[j++] = 0;
         }
-        PRINT(v, e1, e2);
+        //PRINT(v, e1, e2);
         res1 += e1;
         res2 += e2;
     }
@@ -372,6 +375,7 @@ void day9(utils::FileReader& reader, int part) {
 }
 //-----------------------------------------------------------------------------
 void day10(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
     auto lines = reader.allLines();
     std::pair<int, int> s{};
     const int n = lines.size();
@@ -622,6 +626,7 @@ void day14(utils::FileReader& reader, int part) {
 }
 //-----------------------------------------------------------------------------
 void day15(utils::FileReader& reader, int part) {
+    if (part != 1) return; // solves both parts
     int64_t res[2] = {};
     if (!reader.nextLine()) {
         throw utils::MyException("failed to read file");
@@ -1080,27 +1085,199 @@ void day22(utils::FileReader& reader, int part) {
     printf("Res2 = %lld\n", res2);
 }
 //-----------------------------------------------------------------------------
+int day23_longest_dfs1(std::vector<std::string>& lines, std::unordered_set<utils::Coord>& vis, utils::Coord p, int l, utils::Coord& end, int part) {
+    if (p == end) return l;
+    int maxl = 0;
+    vis.insert(p);
+    for (auto d : utils::dir::UDLR) {
+        if (part == 1 && lines[p.i][p.j] != '.' && !(d == (lines[p.i][p.j] == 'v'? utils::dir::D: utils::dir::R))) { // only v and > exist
+            continue;
+        }
+        auto np = p + d;
+        if (np.i >= 0 && lines[np.i][np.j] != '#' && vis.count(np) == 0) {
+            maxl = std::max(maxl, day23_longest_dfs1(lines, vis, np, l + 1, end, part));
+        }
+    }
+    vis.erase(p);
+    return maxl;
+}
 void day23(utils::FileReader& reader, int part) {
     int64_t res = 0;
-    while (reader.nextLine()) {
-        auto line = reader.getLine();
-    }
+    auto lines = reader.allLines();
+    utils::Coord start = {0, 1}, end = {static_cast<int>(lines.size()) - 1, static_cast<int>(lines[0].size()) - 2};
+    std::unordered_set<utils::Coord> vis = {};
+    res = day23_longest_dfs1(lines, vis, start, 0, end, part);
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
 void day24(utils::FileReader& reader, int part) {
     int64_t res = 0;
+    struct Hail {
+        int64_t x, y, z;
+        int vx, vy, vz;
+    };
+    std::vector<Hail> hails;
     while (reader.nextLine()) {
         auto line = reader.getLine();
+        Hail h = {};
+        if (!line.read("%lld, %lld, %lld @ %d, %d, %d", &h.x, &h.y, &h.z, &h.vx, &h.vy, &h.vz)) {
+            throw utils::MyException("failed to read " + std::string{line.get()});
+        }
+        hails.push_back(h);
+    }
+    if (part == 1) {
+        const auto inters2d = [](const Hail& h1, const Hail&h2) -> std::pair<double, double> {
+            auto denom = h1.vy * h2.vx - h2.vy * h1.vx;
+            if (denom != 0) {
+                // Line represented as vy*x + vx*y = c
+                double c1 = h1.vy * h1.x - h1.vx * h1.y;
+                double c2 = h2.vy * h2.x - h2.vx * h2.y;
+
+                double x = (h2.vx * c1 - h1.vx * c2) / denom;
+                double y = -(h1.vy * c2 - h2.vy * c1) / denom;
+
+                if ((x - h1.x) * h1.vx >= 0 && (y - h1.y) * h1.vy >= 0 &&
+                    (x - h2.x) * h2.vx >= 0 && (y - h2.y) * h2.vy >= 0) {
+                        return {x, y}; // intersects in the past
+                    }
+            }
+            return {DBL_MAX, DBL_MAX}; // The lines are parallel
+        };
+        std::pair<int64_t, int64_t> range = {200000000000000, 400000000000000}; //{7, 27};
+        for (int i = 0; i < hails.size(); ++i) {
+            for (int j = i + 1; j < hails.size(); ++j) {
+                auto [x,y] = inters2d(hails[i], hails[j]);
+                if (range.first <= x && x <= range.second && range.first <= y && y < range.second) {
+                    res++;
+                }
+            }
     }
     printf("Res = %lld\n", res);
+    } else {
+        // for (int i = 0; i < 3; ++i) {
+        //     for (int d = 0; d < 3; ++d) {
+        //         printf("(%c - %lld) / (%c - %d)%c", 'x' + d, (&hails[i].x)[d], 'a' + d, (&hails[i].vx)[d], d < 2? '=': '\n');
+        //     }
+        // }
+        std::array<std::set<int>, 3> speeds;
+        for (int i = 0; i < hails.size(); ++i) {
+            for (int j = i + 1; j < hails.size(); ++j) {
+                for (int d = 0; d < 3; ++d) {
+                    auto ve = (&hails[i].vx)[d];
+                    if (ve == (&hails[j].vx)[d]) {
+                        auto dp = (&hails[i].x)[d] - (&hails[j].x)[d];
+                        std::set<int> newspeed;
+                        for (int v = -999; v <= 999; ++v) {
+                            if (v && v != ve && (dp % (ve-v)) == 0) {
+                                if (speeds[d].empty() || speeds[d].count(v)) {
+                                    newspeed.insert(v);
+                                }
+                            }
+                        }
+                        std::swap(speeds[d], newspeed);
+                    }
+                }
+            }
+        }
+        if (std::any_of(speeds.begin(), speeds.end(), [](auto &s) { return s.empty(); })) {
+            throw utils::MyException("failed to find speed");
+        }
+        const int vx = *speeds[0].begin();
+        const int vy = *speeds[1].begin();
+        const int vz = *speeds[2].begin();
+        // PRINT(vx, vy, vz);
+
+        double m1 = static_cast<double>(hails[0].vy - vy) / (hails[0].vx - vx);
+        double m2 = static_cast<double>(hails[1].vy - vy) / (hails[1].vx - vx);
+        double c1 = hails[0].y - m1 * hails[0].x;
+        double c2 = hails[1].y - m2 * hails[1].x;
+        int64_t x = (c2 - c1) / (m1 - m2);
+        int64_t y = m1 * x + c1;
+        int64_t z = hails[0].z + (hails[0].vz - vz) * (x - hails[0].x) / (hails[0].vx - vx);
+
+        printf("Res = %lld\n", x + y + z);
+    }
 }
 //-----------------------------------------------------------------------------
 void day25(utils::FileReader& reader, int part) {
-    int64_t res = 0;
+    if (part != 1) return; // solves both parts
+    int64_t res = 1;
+    utils::StringToIdMap sid;
+    std::unordered_map<int, std::vector<std::pair<int, int>>> adj;
+    std::unordered_map<std::pair<int, int>, int> cost;
     while (reader.nextLine()) {
         auto line = reader.getLine();
+        char buf[10];
+        line.read("%9[a-z]:", buf);
+        const int id = sid.set(buf);
+        auto& list = adj[id];
+        while (line.read(" %9[a-z]", buf)) {
+            const int id2 = sid.set(buf);
+            list.push_back({id2, 1});
+            adj[id2].push_back({id, 1});
+            cost[{id, id2}] = 1;
+        }
     }
+    const int maxid = sid.set("---") - 1;
+    std::vector<int> vis(maxid, 0); // next id is max
+
+    auto reset_cost = [&adj]() {
+        for (auto& [id,list] : adj) {
+            for (auto& [k,c] : list) {
+                c = 1;
+            }
+        }
+    };
+    const auto get_edge = [&adj](int from, int to) {
+        return std::find_if(adj[from].begin(), adj[from].end(), [to](auto& kc) { return kc.first == to; });
+    };
+    auto bfs_flow = [&adj,&vis,&get_edge](int sid, int tid) {
+        std::queue<int> q;
+        q.push(sid);
+        vis[sid] = -1;
+        while (!q.empty()) {
+            int id = q.front();
+            q.pop();
+            if (id == tid) {
+                while (id != sid) {
+                    int par = vis[id];
+                    get_edge(par, id)->second -= 1;
+                    get_edge(id, par)->second += 1;
+                    id = par;
+                }
+                return true;
+            }
+            for (auto [k,c] : adj[id]) {
+                if (c > 0 && !vis[k]) {
+                    q.push(k);
+                    vis[k] = id;
+                }
+            }
+        }
+        return false;
+    };
+    auto one_side = [&]() -> int {
+        for (int id = maxid; id > 0; --id) {
+            for (auto& [k,c] : adj[id]) {
+                if (k < id) continue;
+                reset_cost();
+                get_edge(k, id)->second = 0;
+                c = 0;
+                for (int i = 0; i < 3; ++i) {
+                    std::fill(vis.begin(), vis.end(), 0);
+                    if (!bfs_flow(id, k)) {
+                        if (i == 2) { // found exactly two other paths
+                            // no need to find min cut here, we are just interested in the number
+                            return std::count_if(vis.begin(), vis.end(), [](int v) { return v != 0; });
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return 0;
+    }();
+    res = one_side * (adj.size() - one_side);
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
@@ -1120,9 +1297,9 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const std::string day = strcmp(argv[1], "last")? argv[1]: "22";
+    const std::string day = strcmp(argv[1], "last")? argv[1]: "25";
     const int part = argc > 2? atoi(argv[2]): 1;
-    const std::string inputFile = argc > 3? argv[3]: "input" + day + ".txt";
+    const std::string inputFile = argc > 3? argv[3]: "data/input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();
 
@@ -1136,7 +1313,7 @@ int main(int argc, char **argv)
                 }
             }
         } else {
-            auto reader = utils::FileReader("data/" + inputFile);
+            auto reader = utils::FileReader(inputFile);
             functions.at(day)(reader, part);
         }
     }
