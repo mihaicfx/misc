@@ -966,13 +966,13 @@ void day21(utils::FileReader& reader, int part) {
     const int n = lines.size();
     const int m = lines[0].size();
     utils::Coord start = [&]() {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < m; ++j) {
-            if (lines[i][j] == 'S') {
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < m; ++j) {
+                if (lines[i][j] == 'S') {
                     return utils::Coord{i, j};
+                }
             }
         }
-    }
         return utils::Coord{};
     }();
     lines[start.i][start.j] = '.';
@@ -1085,28 +1085,65 @@ void day22(utils::FileReader& reader, int part) {
     printf("Res2 = %lld\n", res2);
 }
 //-----------------------------------------------------------------------------
-int day23_longest_dfs1(std::vector<std::string>& lines, std::unordered_set<utils::Coord>& vis, utils::Coord p, int l, utils::Coord& end, int part) {
-    if (p == end) return l;
+int day23_longest_dfs(std::vector<std::vector<std::pair<int, int>>>& adj, int64_t vis, int p, int end, int len) {
+    if (p == end) return len;
     int maxl = 0;
-    vis.insert(p);
-    for (auto d : utils::dir::UDLR) {
-        if (part == 1 && lines[p.i][p.j] != '.' && !(d == (lines[p.i][p.j] == 'v'? utils::dir::D: utils::dir::R))) { // only v and > exist
-            continue;
-        }
-        auto np = p + d;
-        if (np.i >= 0 && lines[np.i][np.j] != '#' && vis.count(np) == 0) {
-            maxl = std::max(maxl, day23_longest_dfs1(lines, vis, np, l + 1, end, part));
+    vis |= 1ll << p;
+    for (auto [e, cost] : adj[p]) {
+        if (!(vis & (1ll << e))) {
+            maxl = std::max(maxl, day23_longest_dfs(adj, vis, e, end, len + cost));
         }
     }
-    vis.erase(p);
+    vis ^= 1ll << p;
     return maxl;
 }
+
 void day23(utils::FileReader& reader, int part) {
     int64_t res = 0;
     auto lines = reader.allLines();
     utils::Coord start = {0, 1}, end = {static_cast<int>(lines.size()) - 1, static_cast<int>(lines[0].size()) - 2};
-    std::unordered_set<utils::Coord> vis = {};
-    res = day23_longest_dfs1(lines, vis, start, 0, end, part);
+
+    std::unordered_map<utils::Coord, int> ids{{start, 0}, {end, 1}};
+    std::unordered_set<utils::Coord> vis = {end};
+    std::vector<std::vector<std::pair<int, int>>> adj;
+    const auto addEdge = [&adj](int from, int to, int cost, bool addRev) {
+        adj.resize(std::max<int>(adj.size(), to + 1));
+        adj[from].push_back({to, cost});
+        if (addRev) {
+            adj[to].push_back({from, cost});
+        }
+    };
+
+    std::stack<std::tuple<utils::Coord, utils::Coord, int, int>> st;
+    st.push({start, start + utils::dir::U, ids[start], 0});
+    while (!st.empty()) {
+        auto [pos, prev, pid, len] = st.top();
+        st.pop();
+        if (vis.count(pos)) continue;
+        vis.insert(pos);
+        int ways = 0;
+        for (auto d : utils::dir::UDLR) {
+            ways += pos.i > 0 && lines[pos.i + d.i][pos.j +  d.j] != '#';
+        }
+        if (ways > 2) {
+            int nid = ids[pos] = ids.size();
+            addEdge(pid, nid, len, part == 2);
+            pid = nid;
+            len = 0;
+        }
+        for (auto d : utils::dir::UDLR) {
+            auto np = pos + d;
+            if (np != prev && lines[np.i][np.j] != '#') {
+                if (vis.count(np)) {
+                    addEdge(pid, ids[np], len + 1, part == 2);
+                } else if (part == 2 || lines[np.i][np.j] == '.' || d == (lines[np.i][np.j] == 'v'? utils::dir::D: utils::dir::R)) {
+                    st.push({np, pos, pid, len + 1});
+                }
+            }
+        }
+    }
+    res = day23_longest_dfs(adj, 0ll, 0, 1, 0);
+
     printf("Res = %lld\n", res);
 }
 //-----------------------------------------------------------------------------
@@ -1151,8 +1188,8 @@ void day24(utils::FileReader& reader, int part) {
                     res++;
                 }
             }
-    }
-    printf("Res = %lld\n", res);
+        }
+        printf("Res = %lld\n", res);
     } else {
         // for (int i = 0; i < 3; ++i) {
         //     for (int d = 0; d < 3; ++d) {
@@ -1297,8 +1334,8 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const std::string day = strcmp(argv[1], "last")? argv[1]: "25";
-    const int part = argc > 2? atoi(argv[2]): 1;
+    const std::string day = strcmp(argv[1], "last")? argv[1]: "23";
+    const int part = argc > 2? atoi(argv[2]): 2;
     const std::string inputFile = argc > 3? argv[3]: "data/input" + day + ".txt";
 
     auto start = std::chrono::steady_clock::now();

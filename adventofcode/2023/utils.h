@@ -96,6 +96,9 @@ struct Coord2T {
     constexpr bool operator==(const Coord2T& o) const {
         return i == o.i && j == o.j;
     }
+    constexpr bool operator!=(const Coord2T& o) const {
+        return !(*this == o);
+    }
     constexpr bool operator<(const Coord2T& o) const {
         return i < o.i || (i == o.i && j < o.j);
     }
