@@ -2,9 +2,12 @@
 
 #include "utils.h"
 
-void day1(utils::FileReader& reader, int part);
-void day2(utils::FileReader& reader, int part);
+inline std::map<std::string, std::function<void(utils::FileReader&, int)>> functions = {};
 
-const std::map<std::string, std::function<void(utils::FileReader&, int)>> functions = {
-    { "1", day1 }, { "2", day2 },
-};
+#define DAY(n, ...) \
+void day ## n(__VA_ARGS__); \
+static const auto _day ## n ## _ = []() { \
+    functions[#n] = day ## n;\
+    return 0;\
+}(); \
+void day ## n(__VA_ARGS__)
