@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     auto start = std::chrono::steady_clock::now();
 
     try {
-        if (day == "last") {
+        if (day == "today") {
             const time_t now = time(0);
             const int day_of_month = localtime(&now)->tm_mday;
             day = std::to_string(day_of_month);

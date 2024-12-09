@@ -33,13 +33,17 @@ bool FileReader::nextLine() {
     return read;
 }
 
-std::vector<std::string> FileReader::allLines() {
+std::tuple<std::vector<std::string>, int, int> FileReader::allLines() {
+    int m = 0;
     std::vector<std::string> lines;
     while (nextLine()) {
         getLine();
+        if (m != line.size()) {
+            m = !m? line.size(): -1;
+        }
         lines.emplace_back(std::move(line));
     }
-    return lines;
+    return {lines, lines.size(), m};
 }
 
 FileReader::LineReader FileReader::getLine() {

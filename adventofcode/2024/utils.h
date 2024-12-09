@@ -50,7 +50,7 @@ struct FileReader {
 
     bool nextLine();
     LineReader getLine();
-    std::vector<std::string> allLines();
+    std::tuple<std::vector<std::string>, int, int> allLines();
 
   private:
     FILE* f;
@@ -90,8 +90,14 @@ struct Coord2T {
     constexpr Coord2T operator+(const Coord2T& o) const {
         return {i + o.i, j + o.j};
     }
+    constexpr Coord2T operator-(const Coord2T& o) const {
+        return {i - o.i, j - o.j};
+    }
     constexpr Coord2T operator*(int factor) const {
         return {i * factor, j * factor};
+    }
+    constexpr Coord2T operator-() const {
+        return {-i, -j};
     }
     constexpr bool operator==(const Coord2T& o) const {
         return i == o.i && j == o.j;
@@ -101,6 +107,13 @@ struct Coord2T {
     }
     constexpr bool operator<(const Coord2T& o) const {
         return i < o.i || (i == o.i && j < o.j);
+    }
+
+    constexpr bool inside(int n, int m) const {
+        return i >= 0 && i < n && j >= 0 && j < m;
+    }
+    constexpr Coord2T rot90(bool right) const {
+        return right? Coord2T<T>{j, -i}: Coord2T<T>{-j, i};
     }
 };
 
@@ -180,10 +193,10 @@ inline std::size_t hash_combine(std::size_t seed, std::size_t val)
 
 template <class Container, std::enable_if_t<detail::is_stl_container<Container>::value, bool> = true>
 std::ostream& operator<<(std::ostream& os, const Container& c) {
-    os << "[";
+    os << "[\n";
     for (const auto& el : c) {
         os << el << ", ";
-        if constexpr (detail::is_stl_container<decltype(el)>::value || std::is_same_v<decltype(el), std::string>) {
+        if constexpr (detail::is_stl_container<decltype(el)>::value || std::is_same_v<decltype(el), const std::string&>) {
             os << "\n";
         }
     }

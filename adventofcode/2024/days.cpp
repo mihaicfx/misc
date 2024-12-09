@@ -23,10 +23,228 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
-DAY(5, utils::FileReader& reader, int part) {
+DAY(10, utils::FileReader& reader, int part) {
     int res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
+    }
+    printf("Res%d = %d\n", part, res);
+}
+//-----------------------------------------------------------------------------
+struct Day9Pos {
+    int id = 0, pos = 0, cnt = 0, space = 0, size = 0;
+};
+
+DAY(9, utils::FileReader& reader, int part) {
+    long long res = 0;
+    reader.nextLine();
+    auto line = reader.getLine().get();
+    std::vector<Day9Pos> a;
+    int pos = 0;
+    for (int i = 0; i < line.length(); ++i) {
+        const int cnt = line[i] - '0';
+        if ((i % 2) == 0) a.push_back({i/2, pos, cnt, 0, cnt});
+        else {
+            a.back().space = cnt;
+            a.back().size += cnt;
+        }
+        pos += cnt;
+    }
+    const auto checksum = [](int p, int id, int cnt){
+        return (long long)(id) * (2 * p + cnt - 1) * cnt / 2;
+    };
+    int e = a.size() - 1;
+    if (part == 2) {
+        for (; e > 0; --e) {
+            for (int i = 0; i < e; ++i) {
+                if (a[i].space >= a[e].cnt) {
+                    a[e].pos = a[i].pos + a[i].size - a[i].space;
+                    a[i].space -= a[e].cnt;
+                    //PRINT("move", a[e].id, a[e].pos);
+                    break;
+                }
+            }
+        }
+    }
+    for (int i = 0; i < a.size(); ++i) {
+        res += checksum(a[i].pos, a[i].id, a[i].cnt);
+        int p = a[i].pos + a[i].cnt;
+        int cnt = a[i].space;
+        if (part == 1) {
+            while (cnt && i < e) {
+                int c = std::min(a[e].cnt, cnt);
+                res += checksum(p, a[e].id, c);
+                p += c;
+                cnt -= c;
+                a[e].cnt -= c;
+                if (!a[e].cnt) e--;
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(8, utils::FileReader& reader, int part) {
+    int res = 0;
+    auto [lines, n, m] = reader.allLines();
+    std::unordered_map<char, std::vector<utils::Coord>> antennas;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] != '.') {
+                antennas[lines[i][j]].push_back({i, j});
+            }
+        }
+    }
+    std::unordered_set<utils::Coord> nodes;
+    for (const auto& [_, v] : antennas) {
+        for (int i = 0; i < v.size(); ++i) {
+            for (int j = i + 1; j < v.size(); ++j) {
+                const utils::Coord ab = {v[j].i - v[i].i, v[j].j - v[i].j};
+                const int lim = part == 1? 1: 1000;
+                const auto add_node = [&](const utils::Coord& p, const utils::Coord& d) {
+                    const utils::Coord pp = p + d;
+                    if (pp.inside(n, m)) {
+                        nodes.insert(pp);
+                        return true;
+                    }
+                    return false;
+                };
+                if (part == 1) {
+                    add_node(v[i], -ab);
+                    add_node(v[j], ab);
+                } else {
+                    for (int k = 0; add_node(v[i], -ab * k); ++k);
+                    for (int k = 0; add_node(v[j], ab * k); ++k);
+                }
+            }
+        }
+    }
+    res = nodes.size();
+    printf("Res%d = %d\n", part, res);
+}
+//-----------------------------------------------------------------------------
+bool day7_try(long long target, long long acc, std::vector<int>& vals, int p, bool part2) {
+    if (p == vals.size()) return target == acc;
+    if (part2) {
+        int dig = 1;
+        for (int vp = vals[p]; vp; dig *= 10, vp /= 10);
+        long long acc_conc = acc * dig + vals[p];
+        if (acc_conc <= target && day7_try(target, acc_conc, vals, p + 1, part2)) return true;
+    }
+    long long acc_add = acc + vals[p];
+    long long acc_mul = acc * vals[p];
+    return (acc_add <= target && day7_try(target, acc_add, vals, p + 1, part2)) ||
+           (acc_mul <= target && day7_try(target, acc_mul, vals, p + 1, part2));
+}
+DAY(7, utils::FileReader& reader, int part) {
+    long long res = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        long long target = 0;
+        int v = 0;
+        std::vector<int> vals;
+        if (!line.read("%lld:", &target)) break;
+        while (line.read("%d", &v)) {
+            vals.push_back(v);
+        }
+        if (day7_try(target, vals[0], vals, 1, part == 2)) {
+            res += target;
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(6, utils::FileReader& reader, int part) {
+    int res = 0;
+    auto [lines, n, m] = reader.allLines();
+    utils::Coord pos;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] == '^') {
+                pos = {i, j};
+            }
+        }
+    }
+    lines[pos.i][pos.j] = '.';
+    utils::Dir d = utils::dir::U;
+    std::unordered_set<utils::Coord> vis;
+    while (true) {
+        vis.insert(pos);
+        utils::Coord p2 = pos + d;
+        if (!p2.inside(n, m)) break;
+        if (lines[p2.i][p2.j] == '#') {
+            d = d.rot90(true);
+        } else {
+            if (lines[pos.i][pos.j] == '.') {
+                if (part == 1) {
+                    res++;
+                }
+            }
+            lines[pos.i][pos.j] = '*';
+            if (part == 2 && !vis.count(p2)) {
+                const char old = lines[p2.i][p2.j];
+                lines[p2.i][p2.j] = '#';
+                utils::Dir dd = d.rot90(true);
+                utils::Coord pp = pos;
+                std::unordered_set<std::pair<utils::Coord, utils::Dir>> vis2;
+                while (true) {
+                    utils::Coord p3 = pp + dd;
+                    if (!p3.inside(n, m)) break;
+                    if (lines[p3.i][p3.j] == '#') {
+                        dd = dd.rot90(true);
+                    } else if (vis2.count({pp, dd})) {
+                        res++;
+                        break;
+                    } else {
+                        vis2.insert({pp, dd});
+                        pp = p3;
+                    }
+                }
+                lines[p2.i][p2.j] = old;
+            }
+            pos = p2;
+        }
+    }
+    if (part == 1) res++; // end
+    printf("Res%d = %d\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(5, utils::FileReader& reader, int part) {
+    int res = 0;
+    std::unordered_map<int, std::unordered_set<int>> before;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        int a = 0, b = 0;
+        if (!line.read("%d|%d", &a, &b)) break;
+        before[b].insert(a);
+    }
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        std::vector<int> v;
+        int a = 0;
+        while (line.read("%d", &a)) {
+            v.push_back(a);
+            line.read(",");
+        }
+        bool ok = [&](){
+            bool ok = true;
+            for (int i = 0; i < v.size(); ++i) {
+                for (int j = i + 1; j < v.size(); ++j) {
+                    if (before[v[i]].count(v[j])) {
+                        if (part == 1) {
+                            return false;
+                        } else {
+                            std::swap(v[i], v[j]);
+                            ok = false;
+                        }
+                    }
+                }
+            }
+            return ok;
+        }();
+        if ((part == 1 && ok) || !ok) {
+            res += v[v.size() / 2];
+        }
     }
     printf("Res%d = %d\n", part, res);
 }
@@ -35,9 +253,7 @@ DAY(4, utils::FileReader& reader, int part) {
     int res = 0;
     const char xmas[5] = "XMAS";
     const auto is_ms = [](char a, char b) { return (a == 'M' && b == 'S') || (b == 'M' && a == 'S');};
-    auto lines = reader.allLines();
-    const int n = lines.size();
-    const int m = lines[0].size();
+    auto [lines, n, m] = reader.allLines();
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; ++j) {
             if (part == 1) {
