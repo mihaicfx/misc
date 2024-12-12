@@ -43,7 +43,7 @@ std::tuple<std::vector<std::string>, int, int> FileReader::allLines() {
         }
         lines.emplace_back(std::move(line));
     }
-    return {lines, lines.size(), m};
+    return {lines, static_cast<int>(lines.size()), m};
 }
 
 FileReader::LineReader FileReader::getLine() {
@@ -72,7 +72,7 @@ std::vector<std::string_view> FileReader::LineReader::split(char delim) {
 int StringToIdMap::set(std::string s) {
     auto it = fwd.find(s);
     if (it == fwd.end()) {
-        it = fwd.insert(it, {s, fwd.size() + 1});
+        it = fwd.insert(it, {s, static_cast<int>(fwd.size() + 1)});
     }
     bwd.insert({it->second, std::move(s)});
     return it->second;

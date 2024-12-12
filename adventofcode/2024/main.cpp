@@ -43,6 +43,11 @@ int main(int argc, char **argv)
             if (inputFile.empty()) {
                 inputFile = "data/input" + day + ".txt";
             }
+            if (!std::filesystem::exists(inputFile)) {
+                if (FILE* f = fopen(inputFile.c_str(), "a"); f) {
+                    fclose(f);
+                }
+            }
             for (int p : {1, 2}) {
                 if (part & p) {
                     auto reader = utils::FileReader(inputFile);

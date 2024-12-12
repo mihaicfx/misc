@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 #include <filesystem>
+#include <unordered_set>
 #include <unordered_map>
 #include <map>
 #include <set>
@@ -79,7 +80,7 @@ namespace detail
 {
 
 template <typename Arg, typename... Args>
-void print(std::ostream& os, const char* nl, Arg&& arg, Args&&... args);
+void print(std::ostream& os, const char* names, const char* sep, Arg&& arg, Args&&... args);
 
 template <typename T>
 struct Coord2T {
@@ -119,7 +120,7 @@ struct Coord2T {
 
 } // namespace detail
 
-#define PRINT(...)  utils::detail::print(std::cout, #__VA_ARGS__, __VA_ARGS__)
+#define PRINT(...)    utils::detail::print(std::cout, #__VA_ARGS__, "; ", __VA_ARGS__)
 #define EXCEPTION(msg, ...)  utils::MyException::make(msg, #__VA_ARGS__, __VA_ARGS__)
 
 using Coord = detail::Coord2T<int>;
@@ -141,7 +142,7 @@ template <typename... Args>
 MyException MyException::make(const char* message, const char *names, Args&&... args) {
     std::stringstream ss;
     ss << message << "\nDetails:\n";
-    detail::print(ss, names, std::forward<Args>(args)...);
+    detail::print(ss, names, "\n", std::forward<Args>(args)...);
     return MyException(ss.str());
 }
 
@@ -162,9 +163,10 @@ namespace detail
 void printNextName(std::ostream& os, const char*& p);
 
 template <typename Arg, typename... Args>
-void print(std::ostream& os, const char* names, Arg&& arg, Args&&... args) {
-    printNextName(os, names); os << std::forward<Arg>(arg) << "\n";
-    ((printNextName(os, names), os << std::forward<Args>(args) << "\n"), ...);
+void print(std::ostream& os, const char* names, const char* sep, Arg&& arg, Args&&... args) {
+    printNextName(os, names); os << std::forward<Arg>(arg) << sep;
+    ((printNextName(os, names), os << std::forward<Args>(args) << sep), ...);
+    if (!strchr(sep, '\n')) os << "\n";
 }
 
 namespace is_stl_container_impl {
@@ -175,6 +177,7 @@ namespace is_stl_container_impl {
   template <typename... Args> struct is_stl_container<std::list              <Args...>>:std::true_type{};
   template <typename... Args> struct is_stl_container<std::set               <Args...>>:std::true_type{};
   template <typename... Args> struct is_stl_container<std::map               <Args...>>:std::true_type{};
+  template <typename... Args> struct is_stl_container<std::unordered_set     <Args...>>:std::true_type{};
   template <typename... Args> struct is_stl_container<std::unordered_map     <Args...>>:std::true_type{};
   // others removed for simplicity. see https://stackoverflow.com/questions/9407367/determine-if-a-type-is-an-stl-container-at-compile-time
 }

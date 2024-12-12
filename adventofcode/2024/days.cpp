@@ -23,10 +23,182 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
-DAY(10, utils::FileReader& reader, int part) {
-    int res = 0;
+DAY(14, utils::FileReader& reader, int part) {
+    long long res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(13, utils::FileReader& reader, int part) {
+    long long res = 0;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(12, utils::FileReader& reader, int part) {
+    long long res = 0;
+    auto [lines, n, m] = reader.allLines();
+    std::unordered_set<utils::Coord> vis;
+    const auto region = [&](const utils::Coord& pos) -> std::pair<int, int> {
+        const char mark = lines[pos.i][pos.j];
+        int area = 0;
+        int perim = 0;
+        std::queue<utils::Coord> q;
+        q.push(pos);
+        vis.clear();
+        vis.insert(pos);
+        lines[pos.i][pos.j] = '-';
+        while (!q.empty()) {
+            auto p = q.front(); q.pop();
+            for (const auto& d : utils::dir::UDLR) {
+                utils::Coord pp = p + d;
+                if (pp.inside(n, m) && lines[pp.i][pp.j] == mark) {
+                    q.push(pp);
+                    vis.insert(pp);
+                    lines[pp.i][pp.j] = '-';
+                } else if (!vis.count(pp)) {
+                    perim++;
+                }
+            }
+            area++;
+        }
+        if (part == 2) {
+            for (const auto& p : vis) {
+                for (auto d : {utils::dir::D, utils::dir::R}) {
+                    auto p2 = p + d;
+                    if (vis.count(p2)) {
+                        for (auto dd : {d.rot90(true), d.rot90(false)}) {
+                            if (!vis.count(p + dd) && !vis.count(p2 + dd)) {
+                                perim--;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return {area, perim};
+    };
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] != '-') {
+                auto [area, perim] = region({i, j});
+                res += area * perim;
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+struct Day11Node {
+    long long val = 0;
+    int parent = 0;
+    int size_index = 0;
+    long long size = 1;
+    std::vector<long long> sizes;
+};
+
+DAY(11, utils::FileReader& reader, int part) {
+    long long res = 0;
+    reader.nextLine();
+    auto line = reader.getLine();
+    std::vector<Day11Node> nodes(1);
+    std::unordered_map<long long, int> mn;
+    int v = 0;
+    while (line.read("%d", &v)) {
+        nodes.push_back({v, 0});
+    }
+    int repeat = (part == 1)? 25: 75;
+    for (int k = 0; k < repeat; ++k) {
+        nodes[0].size = 0;
+        nodes.reserve(nodes.size() * 3); // hack to keep a pointer in the vector even if it's resized
+        for (int i = nodes.size() - 1; i; --i) {
+            auto& n = nodes[i];
+            if (mn.count(n.val)) {
+                const int ii = mn[n.val];
+                auto& p = nodes[ii];
+                if (ii != i) {
+                    n.size = p.sizes[n.size_index++];
+                } else {
+                    n.sizes.push_back(n.size);
+                }
+            } else {
+                n.size = 1;
+                if (n.val == 0) {
+                    n.val = 1;
+                } else if (int d = utils::digits(n.val); (d % 2) == 0) {
+                    int x = 1;
+                    for (d = d / 2; d; --d) x *= 10;
+                    nodes.push_back({n.val / x, i});
+                    nodes.push_back({n.val % x, i});
+                    mn[n.val] = i;
+                    n.sizes.push_back(2);
+                    n.size = 2;
+                } else {
+                    n.val *= 2024;
+                }
+            }
+            nodes[n.parent].size += n.size;
+            n.size = 0;
+        }
+        //if (part == 2) PRINT(k, nodes[0].size, s.size(), s);
+    }
+    //res = s.size();
+    printf("Res%d = %lld\n", part, nodes[0].size);
+}
+//-----------------------------------------------------------------------------
+int day10_dfs(utils::Coord pos, const std::vector<std::string> &lines, int n, int m, std::unordered_set<utils::Coord>& vis) {
+    if (lines[pos.i][pos.j] == '9') return 1;
+    int res = 0;
+    vis.insert(pos);
+    for (const auto& d : utils::dir::UDLR) {
+        utils::Coord pp = pos + d;
+        if (pp.inside(n, m) && !vis.count(pp) && lines[pos.i][pos.j] + 1 == lines[pp.i][pp.j]) {
+            res += day10_dfs(pp, lines, n, m, vis);
+        }
+    }
+    vis.erase(pos);
+    return res;
+}
+
+DAY(10, utils::FileReader& reader, int part) {
+    int res = 0;
+    auto [lines, n, m] = reader.allLines();
+    std::vector<utils::Coord> heads;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (lines[i][j] == '0') {
+                heads.push_back({i, j});
+            }
+        }
+    }
+    std::unordered_set<utils::Coord> vis;
+    const auto reach = [&](const utils::Coord& pos) -> int {
+        std::queue<utils::Coord> q;
+        q.push(pos);
+        int count = 0;
+        while (!q.empty()) {
+            auto p = q.front(); q.pop();
+            if (lines[p.i][p.j] == '9') {
+                count++;
+                continue;
+            }
+            for (const auto& d : utils::dir::UDLR) {
+                utils::Coord pp = p + d;
+                if (pp.inside(n, m) && !vis.count(pp) && lines[p.i][p.j] + 1 == lines[pp.i][pp.j]) {
+                    q.push(pp);
+                    vis.insert(pp);
+                }
+            }
+        }
+        return count;
+    };
+    for (const auto& head : heads) {
+        vis.clear();
+        res += part == 1? reach(head): day10_dfs(head, lines, n, m, vis);
     }
     printf("Res%d = %d\n", part, res);
 }
@@ -168,6 +340,7 @@ DAY(6, utils::FileReader& reader, int part) {
     lines[pos.i][pos.j] = '.';
     utils::Dir d = utils::dir::U;
     std::unordered_set<utils::Coord> vis;
+    std::unordered_set<std::pair<utils::Coord, utils::Dir>> vis2;
     while (true) {
         vis.insert(pos);
         utils::Coord p2 = pos + d;
@@ -186,7 +359,7 @@ DAY(6, utils::FileReader& reader, int part) {
                 lines[p2.i][p2.j] = '#';
                 utils::Dir dd = d.rot90(true);
                 utils::Coord pp = pos;
-                std::unordered_set<std::pair<utils::Coord, utils::Dir>> vis2;
+                vis2.clear();
                 while (true) {
                     utils::Coord p3 = pp + dd;
                     if (!p3.inside(n, m)) break;
