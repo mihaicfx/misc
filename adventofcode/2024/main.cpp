@@ -32,11 +32,11 @@ int main(int argc, char **argv)
             day = std::to_string(day_of_month);
         }
         if (day == "all") {
-            for (auto [day, func] : functions) {
-                printf("day %s:\n", day.c_str());
-                for (int part : {1, 2}) {
-                    auto reader = utils::FileReader("data/input" + day + ".txt");
-                    func(reader, part);
+            for (auto [day_, func] : functions) {
+                printf("day %s:\n", day_.c_str());
+                for (int part_ : {1, 2}) {
+                    auto reader = utils::FileReader("data/input" + day_ + ".txt");
+                    func(reader, part_);
                 }
             }
         } else {

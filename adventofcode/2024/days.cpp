@@ -23,7 +23,7 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
-DAY(14, utils::FileReader& reader, int part) {
+DAY(18, utils::FileReader& reader, int part) {
     long long res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
@@ -31,11 +31,319 @@ DAY(14, utils::FileReader& reader, int part) {
     printf("Res%d = %lld\n", part, res);
 }
 //-----------------------------------------------------------------------------
-DAY(13, utils::FileReader& reader, int part) {
-    long long res = 0;
+DAY(17, utils::FileReader& reader, int part) {
+    std::array<long long, 3> reg;
+    std::vector<int> prog;
     while (reader.nextLine()) {
         auto line = reader.getLine();
+        char c;
+        int v;
+        if (line.read("Register %c: %d", &c, &v)) {
+            reg[c - 'A'] = v;
+        } else if (line.read("Program: ")) {
+            while (line.read("%d", &v)) {
+                prog.push_back(v);
+                line.read(",");
+            }
+        }
     }
+    std::vector<int> out;
+    const auto combo = [&reg](int x) -> long long { return x < 4? x: x < 7? reg[x - 4]: -1; };
+    const auto step = [&](int& p) {
+        switch (prog[p]) {
+            case 0 :
+                reg[0] /= (1 << combo(prog[p + 1]));
+                break;
+            case 1 :
+                reg[1] ^= prog[p + 1];
+                break;
+            case 2 :
+                reg[1] = combo(prog[p + 1]) % 8;
+                break;
+            case 3 :
+                if (reg[0]) {
+                    p = prog[p + 1];
+                    return;
+                }
+                break;
+            case 4 :
+                reg[1] ^= reg[2];
+                break;
+            case 5 :
+                out.push_back(combo(prog[p + 1]) % 8);
+                break;
+            case 6 :
+                reg[1] = reg[0] / (1 << combo(prog[p + 1]));
+                break;
+            case 7 :
+                reg[2] = reg[0] / (1 << combo(prog[p + 1]));
+                break;
+        }
+        p += 2;
+    };
+    if (part == 1) {
+        for (int p = 0; p < prog.size(); ) {
+            step(p);
+        }
+        printf("Res%d = ", part);
+        for (int v : out) printf("%d,", v);
+        printf("\n");
+    } else {
+        // based on observation, each program run takes between 3-10 bits of A
+        // to compute the next output value. so we use this to iteratively
+        // find possible input combinations that produce desired output.
+        std::vector<std::unordered_set<long long>> ss;
+        ss.resize(prog.size());
+        const auto run = [&](long long a) {
+            reg[0] = a;
+            reg[1] = reg[2] = 0;
+            out.clear();
+            for (int p = 0; p < prog.size(); ) {
+                step(p);
+            }
+        };
+        for (int i = 0; i < (1 << 10); ++i) {
+            run(i);
+            if (out[0] == prog[0]) {
+                ss[0].insert(i);
+            }
+        }
+        for (int k = 1; k < prog.size(); ++k) {
+            for (auto val : ss[k - 1]) {
+                for (long long q = 0; q < 8; ++q) {
+                    const auto val2 = val | (q << (7 + 3 * k));
+                    run(val2);
+                    if (out[k] == prog[k] && out.size() <= prog.size()) {
+                        ss[k].insert(val2);
+                    }
+                }
+            }
+        }
+        long long res = *std::min_element(ss.back().begin(), ss.back().end());
+        printf("Res%d = %lld\n", part, res);
+    }
+}
+//-----------------------------------------------------------------------------
+DAY(16, utils::FileReader& reader, int part) {
+    long long res = 0;
+    auto [maze, n, m] = reader.allLines();
+    utils::Coord start, dest;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (maze[i][j] == 'S') start = {i, j};
+            else if (maze[i][j] == 'E') dest = {i, j};
+        }
+    }
+    using Par = std::pair<utils::Coord, utils::Dir>;
+    using T4 = std::tuple<int, utils::Coord, utils::Dir, Par>;
+    std::priority_queue<T4, std::vector<T4>, std::greater<T4>> q;
+    std::unordered_map<std::pair<utils::Coord, utils::Dir>, int> vis;
+    std::unordered_map<Par, std::set<Par>> parents;
+    q.push({0, start, utils::dir::R, {}});
+    q.push({1000, start, utils::dir::U, {}});
+    while (!q.empty()) { // dijkstra
+        auto [dist, pos, dir, par] = q.top();
+        q.pop();
+        const auto vit = vis.find({pos,dir});
+        if (vit != vis.end() && dist > vit->second) continue;
+        if (res && res < dist) break;
+        if (part == 2) {
+            parents[{pos,dir}].insert(par);
+        }
+        if (pos == dest) {
+            res = dist;
+            continue;
+        }
+        auto np = pos + dir;
+        if (maze[np.i][np.j] == '#') {
+            continue;
+        }
+        for (int k = -1; k < 2; ++k) {
+            auto nd = k == 0? dir: dir.rot90(k > 0);
+            int cd = dist + 1 + std::abs(k) * 1000;
+            if (auto it = vis.find({np,nd}); it == vis.end() || cd <= it->second) {
+                q.push({cd, np, nd, {pos,dir}});
+                if (it == vis.end()) {
+                    vis.insert({{np,nd}, cd});
+                } else {
+                    it->second = cd;
+                }
+            }
+        }
+    }
+    if (part == 2) {
+        // trace back all paths that lead to dest
+        std::queue<Par> qp;
+        std::unordered_set<utils::Coord> path;
+        for (auto d : utils::dir::UDLR) {
+            qp.push({dest, d});
+        }
+        while (!qp.empty()) {
+            auto [p,d] = qp.front(); qp.pop();
+            if (p == start) break;
+            path.insert(p);
+            //maze[p.i][p.j] = 'O';
+            for (auto pp : parents[{p,d}]) {
+                qp.push(pp);
+            }
+        }
+        //PRINT(maze);
+        res = path.size() + 1;
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(15, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::vector<std::string> maze;
+    std::string moves;
+    utils::Coord pos;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        if (line.get().empty()) break;
+        std::string row = std::string(line.get());
+        if (part == 2) {
+            std::string row2;
+            for (char c : row) {
+                if (c == 'O') row2.append("[]");
+                else {
+                    row2.push_back(c);
+                    row2.push_back(c == '#'? '#': '.');
+                }
+            }
+            row = row2;
+        }
+        if (const char *p = strchr(row.c_str(), '@'); p) {
+            pos = {static_cast<int>(maze.size()), static_cast<int>(p - row.c_str())};
+        }
+        maze.push_back(std::move(row));
+    }
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        moves.append(line.get());
+    }
+    const int n = maze.size();
+    const int m = maze[0].size();
+    const std::map<char, utils::Dir> dirs = {
+        {'^', utils::dir::U}, {'<', utils::dir::L}, {'>', utils::dir::R}, {'v', utils::dir::D},
+    };
+    const auto move_in_maze = [&](const std::unordered_set<utils::Coord>& pos,
+                               const utils::Dir& d, std::unordered_set<utils::Coord>& out) -> int {
+        bool next = false;
+        for (const auto& pp : pos) {
+            utils::Coord p = pp + d;
+            const char c = maze[p.i][p.j];
+            if (c == '#') return -1;
+            if (c != '.') {
+                next = true;
+                out.insert(p);
+                if (d.i && (c == '[' || c == ']')) {
+                    utils::Coord p2 = p + (c == '['? utils::dir::R: utils::dir::L);
+                    out.insert(p2);
+                }
+            }
+        }
+        return next;
+    };
+
+    auto prevmaze = maze;
+    for (char c : moves) {
+        utils::Dir d = dirs.at(c);
+        std::unordered_set<utils::Coord> out{};
+        std::vector<std::unordered_set<utils::Coord>> mm = {{pos}};
+        int status = 0;
+        while ((status = move_in_maze(mm.back(), d, out)) == 1) {
+            mm.push_back(std::move(out));
+            out = {};
+        }
+        if (status == 0) {
+            for (int i = mm.size() - 1; i >= 0; --i) {
+                for (const auto& p : mm[i]) {
+                    const utils::Coord e = p + d;
+                    maze[e.i][e.j] = maze[p.i][p.j];
+                    maze[p.i][p.j] = '.';
+                }
+            }
+            pos = pos + d;
+        }
+    }
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (maze[i][j] == 'O' || maze[i][j] == '[') {
+                res += 100 * i + j;
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(14, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::vector<std::pair<utils::Coord, utils::Dir>> robots;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        int px,py, vx,vy;
+        if (line.read("p=%d,%d v=%d,%d", &py, &px, &vy, &vx)) {
+            robots.push_back({{px, py}, {vx, vy}});
+        }
+    }
+    const int W = 101, H = 103;
+    const auto mod = [](int x, int m) { return ((x % m) + m) % m; };
+    std::array<int, 4> quad{};
+    std::unordered_set<utils::Coord> pos;
+    const auto move = [&](int n) {
+        for (const auto& [v, d] : robots) {
+            const utils::Coord p = v + d * n;
+            const utils::Coord q = {mod(p.i, H), mod(p.j, W)};
+            if (q.i != H / 2 && q.j != W / 2) {
+                quad[(q.i / (H/2 + 1)) * 2 + (q.j / (W/2 + 1))]++;
+            }
+            if (part == 2) {
+                pos.insert(q);
+            }
+        }
+    };
+    if (part == 1) {
+        move(100);
+        res = 1;
+        for (int q : quad) res *= q;
+    } else {
+        for (int i = 100; !res; ++i) {
+            pos.clear();
+            move(i);
+            // guess that we need to stop when no points overlap,
+            // because that is the way these puzzles are built.
+            if (pos.size() == robots.size()) {
+                res = i;
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(13, utils::FileReader& reader, int part) {
+    long long res = 0;
+    int ax,ay, bx,by;
+    long long tx,ty;
+    do {
+        reader.nextLine(); reader.getLine().read("Button A: X+%d, Y+%d", &ax, &ay);
+        reader.nextLine(); reader.getLine().read("Button B: X+%d, Y+%d", &bx, &by);
+        reader.nextLine(); reader.getLine().read("Prize: X=%lld, Y=%lld", &tx, &ty);
+        if (part == 2) {
+            tx += 10000000000000;
+            ty += 10000000000000;
+        }
+        // line1: p=0,0 m=ay/ax,  line2: ptx,ty, m=by/bx
+        // x = (y1 - m2 * x1) / (m1 - m2)
+        const double px = (ty - by * tx / (double) bx) / (ay / (double) ax - by / (double) bx);
+        // y = m1 * x
+        const double py = ay * px / (double) ax;
+        const long long x = std::round(px);
+        const long long y = std::round(py);
+        if ((x % ax) == 0 && ((tx - x) % bx) == 0 && (y % ay) == 0 && ((ty - y) % by) == 0) {
+            res += 3 * (x / ax) + (tx - x) / bx;
+        }
+    } while (reader.nextLine());
     printf("Res%d = %lld\n", part, res);
 }
 //-----------------------------------------------------------------------------
@@ -67,6 +375,7 @@ DAY(12, utils::FileReader& reader, int part) {
             area++;
         }
         if (part == 2) {
+            // merge each two adjacent blocks that form a longer side
             for (const auto& p : vis) {
                 for (auto d : {utils::dir::D, utils::dir::R}) {
                     auto p2 = p + d;
@@ -102,7 +411,6 @@ struct Day11Node {
 };
 
 DAY(11, utils::FileReader& reader, int part) {
-    long long res = 0;
     reader.nextLine();
     auto line = reader.getLine();
     std::vector<Day11Node> nodes(1);
@@ -114,7 +422,7 @@ DAY(11, utils::FileReader& reader, int part) {
     int repeat = (part == 1)? 25: 75;
     for (int k = 0; k < repeat; ++k) {
         nodes[0].size = 0;
-        nodes.reserve(nodes.size() * 3); // hack to keep a pointer in the vector even if it's resized
+        nodes.reserve(nodes.size() * 3); // hack to keep a pointer in the vector even if we add stuff
         for (int i = nodes.size() - 1; i; --i) {
             auto& n = nodes[i];
             if (mn.count(n.val)) {
@@ -146,7 +454,6 @@ DAY(11, utils::FileReader& reader, int part) {
         }
         //if (part == 2) PRINT(k, nodes[0].size, s.size(), s);
     }
-    //res = s.size();
     printf("Res%d = %lld\n", part, nodes[0].size);
 }
 //-----------------------------------------------------------------------------
@@ -176,7 +483,8 @@ DAY(10, utils::FileReader& reader, int part) {
         }
     }
     std::unordered_set<utils::Coord> vis;
-    const auto reach = [&](const utils::Coord& pos) -> int {
+    // ok, part 2 could have been done with dfs, but too late now
+    const auto bfs_reach = [&](const utils::Coord& pos) -> int {
         std::queue<utils::Coord> q;
         q.push(pos);
         int count = 0;
@@ -198,7 +506,7 @@ DAY(10, utils::FileReader& reader, int part) {
     };
     for (const auto& head : heads) {
         vis.clear();
-        res += part == 1? reach(head): day10_dfs(head, lines, n, m, vis);
+        res += part == 1? bfs_reach(head): day10_dfs(head, lines, n, m, vis);
     }
     printf("Res%d = %d\n", part, res);
 }
@@ -272,7 +580,6 @@ DAY(8, utils::FileReader& reader, int part) {
         for (int i = 0; i < v.size(); ++i) {
             for (int j = i + 1; j < v.size(); ++j) {
                 const utils::Coord ab = {v[j].i - v[i].i, v[j].j - v[i].j};
-                const int lim = part == 1? 1: 1000;
                 const auto add_node = [&](const utils::Coord& p, const utils::Coord& d) {
                     const utils::Coord pp = p + d;
                     if (pp.inside(n, m)) {
@@ -308,6 +615,7 @@ bool day7_try(long long target, long long acc, std::vector<int>& vals, int p, bo
     return (acc_add <= target && day7_try(target, acc_add, vals, p + 1, part2)) ||
            (acc_mul <= target && day7_try(target, acc_mul, vals, p + 1, part2));
 }
+
 DAY(7, utils::FileReader& reader, int part) {
     long long res = 0;
     while (reader.nextLine()) {
@@ -319,6 +627,7 @@ DAY(7, utils::FileReader& reader, int part) {
         while (line.read("%d", &v)) {
             vals.push_back(v);
         }
+        // backtracking to the target
         if (day7_try(target, vals[0], vals, 1, part == 2)) {
             res += target;
         }
@@ -399,7 +708,7 @@ DAY(5, utils::FileReader& reader, int part) {
             v.push_back(a);
             line.read(",");
         }
-        bool ok = [&](){
+        bool ok = [&]() {
             bool ok = true;
             for (int i = 0; i < v.size(); ++i) {
                 for (int j = i + 1; j < v.size(); ++j) {
@@ -436,7 +745,7 @@ DAY(4, utils::FileReader& reader, int part) {
                         for (k = 1; k < 4; ++k) {
                             const int ii = i + d.i * k;
                             const int jj = j + d.j * k;
-                            if (!(ii >= 0 && ii < n && jj >= 0 & jj < m && lines[ii][jj] == xmas[k])) {
+                            if (!(ii >= 0 && ii < n && jj >= 0 && jj < m && lines[ii][jj] == xmas[k])) {
                                 break;
                             }
                         }
@@ -466,7 +775,7 @@ DAY(3, utils::FileReader& reader, int part) {
         while (*p) {
             const char c = *p;
             const int prevz = z;
-            switch (z) {
+            switch (z) { // instead of regex, have a state machine
                 case 0: a = b = 0; if (c == 'm') z++; else if (part == 2 && c == 'd') z = 7; else z = 0; break;
                 case 1: if (c == 'u') z++; else z = 0; break;
                 case 2: if (c == 'l') z++; else z = 0; break;
