@@ -33,10 +33,13 @@ int main(int argc, char **argv)
         }
         if (day == "all") {
             for (auto [day_, func] : functions) {
-                printf("day %s:\n", day_.c_str());
-                for (int part_ : {1, 2}) {
-                    auto reader = utils::FileReader("data/input" + day_ + ".txt");
-                    func(reader, part_);
+                inputFile = "data/input" + day_ + ".txt";
+                if (std::filesystem::exists(inputFile)) {
+                    printf("day %s:\n", day_.c_str());
+                    for (int part_ : {1, 2}) {
+                        auto reader = utils::FileReader(inputFile);
+                        func(reader, part_);
+                    }
                 }
             }
         } else {

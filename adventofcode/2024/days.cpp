@@ -23,12 +23,225 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
-DAY(18, utils::FileReader& reader, int part) {
+DAY(22, utils::FileReader& reader, int part) {
     long long res = 0;
     while (reader.nextLine()) {
         auto line = reader.getLine();
     }
     printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+void Day17_comb(std::vector<std::string> &res, std::string curr, utils::Coord pos, int vi, int vj, utils::Coord end) {
+    if (pos == utils::Coord{3, 0}) return; // space
+    if (pos == end) {
+        res.push_back(curr + 'A');
+        return;
+    }
+    if (pos.i != end.i) Day17_comb(res, curr + (vi < 0? '^': 'v'), {pos.i + vi, pos.j}, vi, vj, end);
+    if (pos.j != end.j) Day17_comb(res, curr + (vj < 0? '<': '>'), {pos.i, pos.j + vj}, vi, vj, end);
+}
+
+long long Day17_butpress(std::unordered_map<char, utils::Coord>& kbm, const std::string& in,
+    int level, std::unordered_map<int, std::unordered_map<std::pair<utils::Coord, utils::Coord>, long long>>& cache
+) {
+    long long res = 0;
+    utils::Coord pos = kbm['A'];
+    for (char c : in) {
+        const utils::Coord& to = kbm[c];
+        long long& best_size = cache[level][{pos, to}];
+        if (best_size == 0) {
+            std::vector<std::string> comb;
+            const utils::Coord dist = to - pos;
+            Day17_comb(comb, "", pos, (dist.i < 0? -1: 1), (dist.j < 0? -1: 1), to);
+            for (auto& move : comb) {
+                long long move_size = move.length();
+                if (level) {
+                    move_size = Day17_butpress(kbm, move, level - 1, cache);
+                }
+                if (best_size == 0 || move_size < best_size) {
+                    best_size = move_size;
+                }
+            }
+        }
+        res += best_size;
+        pos = to;
+    }
+    return res;
+}
+
+DAY(21, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::vector<std::string> input;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        input.emplace_back(line.get());
+    }
+    std::unordered_map<char, utils::Coord> kbm;
+    const auto add_to_kbm = [&kbm](const std::vector<std::string>& kb) {
+        for (int i = 0; i < kb.size(); ++i) {
+            for (int j = 0; j < kb[i].size(); ++j) {
+                kbm[kb[i][j]] = utils::Coord{i, j};
+            }
+        }
+    };
+    const std::vector<std::string> kb1 = {"789","456","123"," 0A"};
+    const std::vector<std::string> kb2 = {"","","", " ^A","<v>"};
+    add_to_kbm(kb1);
+    add_to_kbm(kb2);
+    const int levels = part == 1? 2: 25;
+    std::unordered_map<int, std::unordered_map<std::pair<utils::Coord, utils::Coord>, long long>> cache;
+    for (std::string in : input) {
+        int num_part = 0;
+        for (char c : in) {
+            if (std::isdigit(c)) {
+                num_part = num_part * 10 + (c - '0');
+            }
+        }
+        long long total_size = Day17_butpress(kbm, in, levels, cache);
+        PRINT(in, total_size, num_part);
+        res += total_size * num_part;
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(20, utils::FileReader& reader, int part) {
+    long long res = 0;
+    auto [maze, n, m] = reader.allLines();
+    utils::Coord start, end;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < m; ++j) {
+            if (maze[i][j] == 'S') start = {i, j};
+            else if (maze[i][j] == 'E') end = {i, j};
+        }
+    }
+    std::vector<std::vector<int>> dist{static_cast<std::size_t>(n), std::vector<int>(m, -1)};
+    std::queue<std::pair<int, utils::Coord>> q;
+    q.push({0, end});
+    dist[end.i][end.j] = 0;
+    while (!q.empty()) {
+        const auto [d,p] = q.front(); q.pop();
+        for (const auto& dir : utils::dir::UDLR) {
+            const auto pp = p + dir;
+            if (maze[pp.i][pp.j] != '#') {
+                if (dist[pp.i][pp.j] == -1) {
+                    dist[pp.i][pp.j] = d + 1;
+                    q.push({d + 1, pp});
+                }
+            }
+        }
+    }
+    const int normal_dist = dist[start.i][start.j];
+    std::vector<std::vector<char>> vis{static_cast<std::size_t>(n), std::vector<char>(m)};
+    q.push({0, start});
+    vis[start.i][start.j] = 1;
+    const int kk = part == 1? 2: 20;
+    while (!q.empty()) {
+        const auto [d,p] = q.front(); q.pop();
+        for (int i = -kk; i <= kk; ++i) {
+            const int jkk = kk - std::abs(i);
+            for (int j = -jkk; j <= jkk; ++j) {
+                const auto pp2 = p + utils::Dir{i, j};
+                if (pp2.inside(n, m) && dist[pp2.i][pp2.j] != -1) {
+                    const int dnew = d + dist[pp2.i][pp2.j] + std::abs(i) + std::abs(j);
+                    const int save = normal_dist - dnew;
+                    if (save >= 100) {
+                        res++;
+                    }
+                }
+            }
+        }
+        for (const auto& dir : utils::dir::UDLR) {
+            const auto pp = p + dir;
+            if (maze[pp.i][pp.j] != '#') {
+                if (!vis[pp.i][pp.j]) {
+                    vis[pp.i][pp.j] = 1;
+                    q.push({d + 1, pp});
+                }
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(19, utils::FileReader& reader, int part) {
+    long long res = 0;
+    reader.nextLine();
+    std::vector<std::string> pat;
+    for (auto s : reader.getLine().split(",")) {
+        pat.push_back(std::string(utils::trim(s)));
+    }
+    reader.nextLine();
+    while (reader.nextLine()) {
+        const auto des = reader.getLine().get();
+        std::vector<long long> ways(des.size() + 1);
+        ways[0] = 1;
+        for (int i = 0; i < des.size(); ++i) {
+            for (const auto& p : pat) {
+                if (des.substr(i, p.size()) == p) {
+                    ways[i + p.size()] += ways[i];
+                }
+            }
+        }
+        res += part == 1? ways.back() != 0: ways.back();
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(18, utils::FileReader& reader, int part) {
+    long long res = 0;
+    const int n = 71, m = n;
+    int bytes_set = 1024;
+    std::vector<std::pair<int, int>> bytes;
+    std::vector<std::string> maze{n, std::string(m, '.')};
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        int x, y;
+        if (line.read("%d,%d", &x, &y)) {
+            bytes.push_back({x, y});
+        }
+    }
+    const utils::Coord dest = {n - 1, m - 1};
+    const auto bfs = [&](int nbytes) {
+        auto maze2 = maze;
+        for (int i = 0; i < nbytes; ++i) {
+            const auto [x, y] = bytes[i];
+            maze2[y][x] = '#';
+        }
+        utils::Coord pos = {0, 0};
+        std::queue<std::pair<utils::Coord, int>> q;
+        q.push({pos, 0});
+        maze2[pos.i][pos.j] = 'O';
+        while (!q.empty()) {
+            auto [p, d] = q.front(); q.pop();
+            if (p == dest) {
+                return d;
+            }
+            for (const auto& dd : utils::dir::UDLR) {
+                utils::Coord pp = p + dd;
+                if (pp.inside(n, m) && maze2[pp.i][pp.j] == '.') {
+                    q.push({pp, d + 1});
+                    maze2[pp.i][pp.j] = 'O';
+                }
+            }
+        }
+        return -1;
+    };
+    if (part == 1) {
+        res = bfs(bytes_set);
+        printf("Res%d = %lld\n", part, res);
+    } else {
+        int s = bytes_set, e = bytes.size();
+        while (s < e) {
+            const int mid = (s + e) / 2;
+            if (bfs(mid) == -1) {
+                e = mid;
+            } else {
+                s = mid + 1;
+            }
+        }
+        const auto [x,y] = bytes[s - 1];
+        printf("Res%d = %d,%d\n", part, x, y);
+    }
 }
 //-----------------------------------------------------------------------------
 DAY(17, utils::FileReader& reader, int part) {

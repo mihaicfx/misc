@@ -50,15 +50,15 @@ FileReader::LineReader FileReader::getLine() {
     return {line};
 }
 
-std::vector<std::string_view> FileReader::LineReader::split(char delim) {
+std::vector<std::string_view> FileReader::LineReader::split(std::string_view delim) {
     std::vector<std::string_view> res;
     auto i = pos;
     for (; i < line.length(); ++i) {
-        if (line[i] == delim) {
+        if (line.substr(i, delim.size()) == delim) {
             if (pos != i) {
                 res.emplace_back(line.substr(pos, i - pos));
             }
-            pos = i + 1;
+            pos = i + delim.size();
         }
     }
     if (pos != i) { // last
@@ -80,6 +80,16 @@ int StringToIdMap::set(std::string s) {
 
 const std::string& StringToIdMap::get(int id) {
     return bwd.at(id);
+}
+
+std::string_view trim(std::string_view str)
+{
+    int i = 0, j = str.size() - 1;
+    while (i < j && str[i] == ' ') ++i;
+    while (i < j && str[j] == ' ') --j;
+    str.remove_suffix(str.size() - j - 1);
+    str.remove_prefix(i);
+    return str;
 }
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <exception>
 #include <string>
 #include <string_view>
@@ -29,8 +30,6 @@ public:
 };
 
 
-
-
 struct FileReader {
     struct LineReader {
         LineReader(const std::string_view& _line) : line(_line) {}
@@ -39,7 +38,7 @@ struct FileReader {
         template<typename... Args>
         bool read(const char* fmt, Args... args);
 
-        std::vector<std::string_view> split(char delim);
+        std::vector<std::string_view> split(std::string_view delim);
 
      private:
         std::string_view line;
@@ -69,6 +68,7 @@ struct StringToIdMap {
     std::unordered_map<int, const std::string> bwd;
 };
 
+std::string_view trim(std::string_view str);
 
 std::vector<std::pair<int, int>> splitWork(int size);
 
