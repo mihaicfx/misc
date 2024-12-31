@@ -36,10 +36,15 @@ int main(int argc, char **argv)
                 inputFile = "data/input" + day_ + ".txt";
                 if (std::filesystem::exists(inputFile)) {
                     printf("day %s:\n", day_.c_str());
+
+                    auto local_start = std::chrono::steady_clock::now();
                     for (int part_ : {1, 2}) {
                         auto reader = utils::FileReader(inputFile);
                         func(reader, part_);
                     }
+                    auto local_end = std::chrono::steady_clock::now();
+                    double elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(local_end - local_start).count();
+                    printf("time: %.3fs\n", elapsed);
                 }
             }
         } else {

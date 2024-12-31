@@ -23,25 +23,307 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
-DAY(22, utils::FileReader& reader, int part) {
+DAY(25, utils::FileReader& reader, int part) {
+    if (part != 1) return;
     long long res = 0;
+    std::vector<std::vector<std::string>> inp(1);
     while (reader.nextLine()) {
         auto line = reader.getLine();
+        if (line.get().empty()) inp.emplace_back();
+        else inp.back().push_back(std::string(line.get()));
+    }
+    std::vector<std::vector<int>> locks, keys;
+    for (const auto& m : inp) {
+        std::vector<int>& where = (m[0][0] == '#'? locks: keys).emplace_back(m[0].size());
+        for (int j = 0; j < m[0].size(); ++j) {
+            int i = 0;
+            while (m[i][j] == m[0][j]) ++i;
+            where[j] = i;
+        }
+    }
+    for (const auto& l : locks) {
+        for (const auto& k : keys) {
+            bool fits = true;
+            for (int i = 0; i < l.size() && fits; ++i) {
+                fits &= l[i] <= k[i];
+            }
+            if (fits) res++;
+        }
+    }
+    printf("Res = %lld\n", res);
+}
+//-----------------------------------------------------------------------------
+struct Day24_OP {
+    std::string a, b, out;
+    char op;
+};
+
+void Day24_compute(const Day24_OP &op, const std::unordered_map<std::string, Day24_OP>& ops,
+    std::unordered_map<std::string, bool>& vals) {
+    vals[op.out] = 0; // mark
+    if (!vals.count(op.a)) {
+        Day24_compute(ops.at(op.a), ops, vals);
+    }
+    if (!vals.count(op.b)) {
+        Day24_compute(ops.at(op.b), ops, vals);
+    }
+    const bool a = vals.at(op.a);
+    const bool b = vals.at(op.b);
+    vals[op.out] = [&]() {
+        switch (op.op) {
+            case 'A' : return a & b;
+            case 'O' : return a | b;
+            case 'X' : return a ^ b;
+        }
+        return 0;
+    }();
+}
+
+DAY(24, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::unordered_map<std::string, bool> vals;
+    std::unordered_map<std::string, Day24_OP> ops;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        char name1[10], op[5], name2[10], out[10];
+        int val;
+        if (line.read("%[a-z0-9]: %d", name1, &val)) {
+            vals[name1] = val;
+        } else if (line.read("%s %s %s -> %s", name1, op, name2, out)) {
+            ops[out] = {name1, name2, out, op[0]};
+        }
+    }
+    if (part == 1) {
+        for (const auto& [out, op] : ops) {
+            if (out[0] == 'z') {
+                if (!vals.count(out)) {
+                    Day24_compute(op, ops, vals);
+                }
+                const int n = std::atoi(out.data() + 1);
+                res |= ((long long)(vals[out]) << n);
+            }
+        }
+        printf("Res%d = %lld\n", part, res);
+    } else {
+        // because we need to have an adder, it means that the structure of the gates must be somewhat
+        // formed like a chain of bit adders and carry over bits (computed by OR gates)
+        // so, divide the schematic into small parts that can be checked, where we find and brute force fix the error
+        std::vector<std::string> vres;
+        const auto name_for = [](char c, int i) -> std::string { char buf[5]; std::sprintf(buf, "%c%02d", c, i); return buf; };
+        int to_io = 45; // hardcoded max output bit, could be searched in the input
+        Day24_OP* carry_op = &ops[name_for('z', to_io)];
+        while (carry_op) {
+            std::queue<Day24_OP*> q;
+            q.push(carry_op);
+            Day24_OP* new_carry_op = nullptr;
+            int io = to_io;
+            std::vector<std::string> level_ops;
+            while (!q.empty()) {
+                auto op = q.front(); q.pop();
+                if (op->op == 'O' && op != carry_op) { // stop at OR gates
+                    new_carry_op = op;
+                    continue;
+                }
+                if (op != carry_op && std::find(level_ops.begin(), level_ops.end(), op->out) == level_ops.end()) {
+                    level_ops.push_back(op->out);
+                }
+                for (auto& o : {op->a, op->b}) {
+                    if (ops.count(o)) q.push(&ops[o]);
+                    else io = std::min(io, std::atoi(o.data() + 1));
+                }
+            }
+            for (int i = io; i < to_io; ++i) {
+                level_ops.push_back(name_for('z', i));
+            }
+            // now we have all gates from this level; check if ok
+            const auto check_at = [&](int io, int nbits) -> bool {
+                int mask = 1 << (2 * nbits + !!new_carry_op);
+                while (mask--) {
+                    vals.clear();
+                    for (int i = 0; i < nbits; ++i) {
+                        vals[name_for('x', io + i)] = (mask >> i) & 1;
+                        vals[name_for('y', io + i)] = (mask >> (nbits + i)) & 1;
+                    }
+                    if (new_carry_op) {
+                        vals[new_carry_op->out] = (mask >> (2 * nbits)) & 1;
+                    }
+                    const int mm = (1 << nbits) - 1;
+                    const int expected = (mask & mm) + ((mask >> nbits) & mm) + (mask >> (2 * nbits));
+                    for (int i = 0; i < nbits; ++i) {
+                        const std::string zi = name_for('z', io + i);
+                        Day24_compute(ops[zi], ops, vals);
+                        if (vals[zi] != ((expected >> i) & 1)) {
+                            return false;
+                        }
+                    }
+                    // Day24_compute(*carry_op, ops, vals); // skip checking carry
+                }
+                return true;
+            };
+            if (!check_at(io, to_io - io)) {
+                const auto swap_op = [](Day24_OP& o1, Day24_OP& o2) {
+                    std::swap(o1.a, o2.a);
+                    std::swap(o1.op, o2.op);
+                    std::swap(o1.b, o2.b);
+                };
+                for (int i = 0; i < level_ops.size(); ++i) {
+                    for (int j = i + 1; j < level_ops.size(); ++j) {
+                        swap_op(ops[level_ops[i]], ops[level_ops[j]]);
+                        if (check_at(io, to_io - io)) {
+                            vres.push_back(level_ops[i]);
+                            vres.push_back(level_ops[j]);
+                            i = j = level_ops.size();
+                            break;
+                        }
+                        swap_op(ops[level_ops[i]], ops[level_ops[j]]);
+                    }
+                }
+            }
+            // advance
+            carry_op = new_carry_op;
+            to_io = io;
+        }
+        std::string sres;
+        std::sort(vres.begin(), vres.end());
+        for (const auto& s : vres) {
+            sres += s + ",";
+        }
+        printf("Res%d = %s\n", part, sres.c_str());
+    }
+}
+//-----------------------------------------------------------------------------
+void Day23_clique(std::vector<std::string_view> sel, const std::vector<std::string>& list, int i,
+    std::vector<std::string_view>& res, const std::unordered_map<std::string, std::vector<std::string>>& adj) {
+    if (i == list.size()) {
+        if (sel.size() > res.size()) { // no need to consider == case, because of initial sort
+            res = sel;
+        }
+        return;
+    }
+    bool connected = true;
+    const auto& ll = adj.at(list[i]);
+    for (int k = 1; k < sel.size(); ++k) { // first is ignored here
+        if (std::find(ll.begin(), ll.end(), sel[k]) == ll.end()) {
+            connected = false;
+        }
+    }
+    if (connected && (sel[0] < list[i])) { // optimization: only consider lexicographical one first
+        sel.push_back(list[i]);
+        Day23_clique(sel, list, i + 1, res, adj);
+        sel.pop_back();
+    }
+    Day23_clique(sel, list, i + 1, res, adj);
+}
+
+DAY(23, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::unordered_map<std::string, std::vector<std::string>> adj;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        char c1[3], c2[3];
+        if (line.read("%2s-%2s", c1, c2)) {
+            adj[c1].push_back(c2);
+            adj[c2].push_back(c1);
+        }
+    }
+    for (auto& [n, l] : adj) {
+        std::sort(l.begin(), l.end());
+    }
+    if (part == 1) {
+        const auto starts_with_t = [&](const std::string& id) { return id[0] == 't'; };
+        for (const auto& [n, l] : adj) {
+            bool st = starts_with_t(n);
+            for (int i = 0; i < l.size(); ++i) {
+                bool sti = st || starts_with_t(l[i]);
+                const auto& ll = adj[l[i]];
+                for (int j = i + 1; j < l.size(); ++j) {
+                    if ((sti || starts_with_t(l[j])) && std::find(ll.begin(), ll.end(), l[j]) != ll.end()) {
+                        res++;
+                    }
+                }
+            }
+        }
+        res /= 3; // counted 3 times each; fast, no point optimizing
+        printf("Res%d = %lld\n", part, res);
+    } else {
+        int msf = 0;
+        std::string sres;
+        for (const auto& [n, l] : adj) {
+            std::vector<std::string_view> sel = {n}, clique;
+            Day23_clique(sel, l, 0, clique, adj);
+            if (clique.size() >= msf) {
+                std::string r;
+                for (const auto& s : clique) {
+                    if (!r.empty()) r += ",";
+                    r += s;
+                }
+                if (msf < clique.size() || r < sres) {
+                    sres = r;
+                }
+                msf = clique.size();
+            }
+        }
+        printf("Res%d = %s\n", part, sres.c_str());
+    }
+}
+//-----------------------------------------------------------------------------
+DAY(22, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::vector<long long> vals;
+    while (reader.nextLine()) {
+        auto line = reader.getLine();
+        long long v = 0;
+        if (line.read("%lld", &v)) {
+            vals.push_back(v);
+        }
+    }
+    const auto step = [](long long x) {
+        constexpr int N = 16'777'216;
+        x = ((x * 64) ^ x) % N;
+        x = ((x / 32) ^ x) % N;
+        x = ((x * 2048) ^ x) % N;
+        return x;
+    };
+    std::unordered_set<int> seen;
+    std::unordered_map<int, int> scores;
+    for (auto v : vals) {
+        seen.clear();
+        long long change = 0;
+        for (int i = 0; i < 2000; ++i) {
+            const int prevd = v % 10;
+            v = step(v);
+            if (part == 2 && i > 2) {
+                const int currd = (v % 10);
+                change = ((change << 5) + (10 + currd - prevd)) & 0xFFFFF;
+                if (!seen.count(change)) {
+                    seen.insert(change);
+                    scores[change] += currd;
+                }
+            }
+        }
+        if (part == 1) {
+            res += v;
+        }
+    }
+    if (part == 2) {
+        for (auto [_,sum] : scores) {
+            res = std::max<int>(res, sum);
+        }
     }
     printf("Res%d = %lld\n", part, res);
 }
 //-----------------------------------------------------------------------------
-void Day17_comb(std::vector<std::string> &res, std::string curr, utils::Coord pos, int vi, int vj, utils::Coord end) {
+void Day21_comb(std::vector<std::string> &res, std::string curr, utils::Coord pos, int vi, int vj, utils::Coord end) {
     if (pos == utils::Coord{3, 0}) return; // space
     if (pos == end) {
         res.push_back(curr + 'A');
         return;
     }
-    if (pos.i != end.i) Day17_comb(res, curr + (vi < 0? '^': 'v'), {pos.i + vi, pos.j}, vi, vj, end);
-    if (pos.j != end.j) Day17_comb(res, curr + (vj < 0? '<': '>'), {pos.i, pos.j + vj}, vi, vj, end);
+    if (pos.i != end.i) Day21_comb(res, curr + (vi < 0? '^': 'v'), {pos.i + vi, pos.j}, vi, vj, end);
+    if (pos.j != end.j) Day21_comb(res, curr + (vj < 0? '<': '>'), {pos.i, pos.j + vj}, vi, vj, end);
 }
 
-long long Day17_butpress(std::unordered_map<char, utils::Coord>& kbm, const std::string& in,
+long long Day21_butpress(std::unordered_map<char, utils::Coord>& kbm, const std::string& in,
     int level, std::unordered_map<int, std::unordered_map<std::pair<utils::Coord, utils::Coord>, long long>>& cache
 ) {
     long long res = 0;
@@ -52,11 +334,11 @@ long long Day17_butpress(std::unordered_map<char, utils::Coord>& kbm, const std:
         if (best_size == 0) {
             std::vector<std::string> comb;
             const utils::Coord dist = to - pos;
-            Day17_comb(comb, "", pos, (dist.i < 0? -1: 1), (dist.j < 0? -1: 1), to);
+            Day21_comb(comb, "", pos, (dist.i < 0? -1: 1), (dist.j < 0? -1: 1), to);
             for (auto& move : comb) {
                 long long move_size = move.length();
                 if (level) {
-                    move_size = Day17_butpress(kbm, move, level - 1, cache);
+                    move_size = Day21_butpress(kbm, move, level - 1, cache);
                 }
                 if (best_size == 0 || move_size < best_size) {
                     best_size = move_size;
@@ -97,8 +379,7 @@ DAY(21, utils::FileReader& reader, int part) {
                 num_part = num_part * 10 + (c - '0');
             }
         }
-        long long total_size = Day17_butpress(kbm, in, levels, cache);
-        PRINT(in, total_size, num_part);
+        long long total_size = Day21_butpress(kbm, in, levels, cache);
         res += total_size * num_part;
     }
     printf("Res%d = %lld\n", part, res);
