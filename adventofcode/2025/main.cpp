@@ -1,0 +1,77 @@
+/*
+ * adventofcode.cpp
+ *
+ * Author: Mihai Feier
+ * Copyright QTronic GmbH. All rights reserved.
+ */
+
+#include <string>
+#include <chrono>
+#include <exception>
+
+#include "days.h"
+#include "utils.h"
+
+int main(int argc, char **argv)
+{
+    if (argc < 2 || argc > 4) {
+        printf("Invalid arguments. Usage: %s day [part [input_file]]", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    std::string day = argv[1];
+    const int part = argc > 2? atoi(argv[2]): 3;
+    std::string inputFile = argc > 3? argv[3]: "";
+
+    auto start = std::chrono::steady_clock::now();
+
+    try {
+        if (day == "today") {
+            const time_t now = time(0);
+            const int day_of_month = localtime(&now)->tm_mday;
+            day = std::to_string(day_of_month);
+        }
+        if (day == "all") {
+            for (auto [day_, func] : functions) {
+                inputFile = "data/input" + day_ + ".txt";
+                if (std::filesystem::exists(inputFile)) {
+                    printf("day %s:\n", day_.c_str());
+
+                    auto local_start = std::chrono::steady_clock::now();
+                    for (int part_ : {1, 2}) {
+                        auto reader = utils::FileReader(inputFile);
+                        func(reader, part_);
+                    }
+                    auto local_end = std::chrono::steady_clock::now();
+                    double elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(local_end - local_start).count();
+                    printf("time: %.3fs\n", elapsed);
+                }
+            }
+        } else {
+            if (inputFile.empty()) {
+                inputFile = "data/input" + day + ".txt";
+            }
+            if (!std::filesystem::exists(inputFile)) {
+                if (FILE* f = fopen(inputFile.c_str(), "a"); f) {
+                    fclose(f);
+                }
+            }
+            for (int p : {1, 2}) {
+                if (part & p) {
+                    auto reader = utils::FileReader(inputFile);
+                    functions.at(day)(reader, p);
+                }
+            }
+        }
+    }
+    catch (std::exception &ex) {
+        printf("Exception caught: %s\n", ex.what());
+    }
+
+    const auto finish = std::chrono::steady_clock::now();
+    const double elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(finish - start).count();
+    const char* partStr = part == 1? "1": part == 2? "2": "1 & 2";
+    printf("Day %s part %s: Done in %.3fs\n", day.c_str(), partStr, elapsed);
+
+    return 0;
+}

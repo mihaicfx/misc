@@ -1,0 +1,2 @@
+# Enable runfiles symlink creation on Windows
+build --enable_runfiles
