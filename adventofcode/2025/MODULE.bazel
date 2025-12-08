@@ -3,7 +3,7 @@ module(
     version = "0.1.0",
 )
 
-bazel_dep(name = "rules_cc", version = "0.0.9")
+bazel_dep(name = "rules_cc", version = "0.2.14")
 
 cc_toolchain = use_repo_rule("@rules_cc//cc:toolchain_config.bzl", "cc_toolchain_config")
 cc_toolchain(
