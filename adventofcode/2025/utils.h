@@ -100,6 +100,7 @@ struct StringToIdMap {
     int set(std::string s);
     const std::string& get(int id);
     int get(const std::string& s) { return fwd.at(s); }
+    int size() const { return fwd.size(); }
 
   private:
     std::unordered_map<std::string, int> fwd;
@@ -274,6 +275,17 @@ template <typename T, typename U>
 struct std::hash<std::pair<T, U>> {
     size_t operator()(const std::pair<T, U> & x) const {
         return utils::detail::hash_combine(hash<T>()(x.first), hash<U>()(x.second));
+    }
+};
+
+template <typename T, std::size_t N>
+struct std::hash<std::array<T, N>> {
+    size_t operator()(const std::array<T, N> & x) const {
+        auto h = hash<T>()(x[0]);
+        for (int i = 1; i < N; ++i) {
+            h = utils::detail::hash_combine(h, hash<T>()(x[i]));
+        }
+        return h;
     }
 };
 

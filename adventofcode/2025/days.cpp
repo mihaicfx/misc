@@ -22,6 +22,332 @@
 #include <thread>
 
 //-----------------------------------------------------------------------------
+DAY(12, utils::FileReader& reader, int part) {
+    if (part == 2) return;
+    long long res = 0;
+    std::array<int, 6> shapes; // 6 shapes of size 3x3
+    for (int i = 0; i < 6; ++i) {
+        reader.nextLine();
+        int cnt = 0;
+        for (int j = 0; j < 3; ++j) {
+            reader.nextLine();
+            auto a = reader.getLine().get();
+            cnt += std::count(a.begin(), a.end(), '#');
+        }
+        shapes[i] = cnt;
+        reader.nextLine(); // space
+    }
+    for (auto line : reader) {
+        int n, m, x[6];
+        line.read("%dx%d: %d %d %d %d %d %d", &n, &m, x + 0, x + 1, x + 2, x + 3, x + 4, x + 5);
+        // dissapointing solution: just check if area is enough
+        int s = n * m;
+        for (int i = 0; i < 6; ++i) {
+            s -= x[i] * shapes[i];
+        }
+        res += s >= 0;
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(11, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::unordered_map<int, std::vector<int>> graph;
+    utils::StringToIdMap str2id;
+    for (auto line : reader) {
+        const auto els = line.split(" ");
+        auto& e = graph[str2id.set(std::string(els[0].substr(0, 3)))];
+        for (int i = 1; i < els.size(); ++i) {
+            e.push_back(str2id.set(std::string(els[i])));
+        }
+    }
+    int end = str2id.get("out");
+    if (part == 1) {
+        std::vector<long long> d(str2id.size() + 1);
+        d[str2id.get("you")] = 1;
+        bool go = true;
+        while (go) {
+            go = false;
+            std::vector<long long> d2(d.size());
+            for (int i = 0; i < d.size(); ++i) {
+                if (d[i]) {
+                    for (const auto j : graph[i]) {
+                        d2[j] += d[i];
+                        go = true;
+                    }
+                }
+            }
+            d = d2;
+            res += d[end];
+        }
+    } else {
+        int a = str2id.get("dac");
+        int b = str2id.get("fft");
+        std::array<std::vector<long long>, 4> d;
+        for (auto &dd : d) {
+            dd.resize(str2id.size() + 1);
+        }
+        d[0][str2id.get("svr")] = 1;
+        bool go = true;
+        while (go) {
+            go = false;
+            std::array<std::vector<long long>, 4> d2;
+            for (auto &dd : d2) {
+                dd.resize(str2id.size() + 1);
+            }
+            for (int k = 0; k < 4; ++k) {
+                for (int i = 0; i < d[k].size(); ++i) {
+                    if (d[k][i]) {
+                        for (const auto j : graph[i]) {
+                            int kk = k;
+                            if (j == a) {
+                                kk += 2;
+                            } else if (j == b) {
+                                kk += 1;
+                            }
+                            d2[kk][j] += d[k][i];
+                            go = true;
+                        }
+                    }
+                }
+            }
+            d = d2;
+            res += d[3][end];
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+int Day10_part1(std::string_view lights, const std::vector<int>& v) {
+    int target = 0;
+    for (int i = 0; i < lights.size() - 2; ++i) {
+        target |= (lights[i + 1] == '#') << i;
+    }
+    int level = 0;
+    int next = 1;
+    int found = 0;
+    std::queue<int> q;
+    std::vector<bool> vis(1 << 10);
+    vis[0] = true;
+    q.push(0);
+    while (!q.empty() && found == 0) {
+        const auto e = q.front();
+        q.pop();
+        for (int i = 0; i < v.size(); ++i) {
+            const int ne = e ^ v[i];
+            if (!vis[ne]) {
+                vis[ne] = true;
+                q.push(ne);
+                if (ne == target) {
+                    found = level + 1;
+                    break;
+                }
+            }
+        }
+        if (--next == 0) {
+            level++;
+            next = q.size();
+        }
+    }
+    return found;
+}
+
+// runs for a very long time. there must be someting better
+int Day10_p2_bt(std::vector<std::vector<int>>& m, std::vector<int> re) {
+    int pi = -1;
+    int pn = 99;
+    int pp = 0;
+    int ps = 0;
+    for (int i = 0; i < m.size(); ++i) {
+        int s = m[i][0];
+        int p = -1;
+        int n = 0;
+        for (int j = 1; j < m[i].size(); ++j) {
+            const int v = re[m[i][j]];
+            if (v == -1) {
+                p = j;
+                n++;
+            } else {
+                s -= v;
+            }
+        }
+        if (s < 0) return -1;
+        if (n == 0 && s > 0) return -1;
+        if (n > 0 && n < pn) {
+            pi = i;
+            pn = n;
+            pp = p;
+            ps = s;
+        }
+    }
+    if (pi == -1) {
+        return std::accumulate(re.begin(), re.end(), 0, [](int a, int b) {
+            return b >= 0? a + b: a;
+        });
+    }
+    int res = -1;
+    if (pn == 1) {
+        re[m[pi][pp]] = ps;
+        res = Day10_p2_bt(m, re);
+        re[m[pi][pp]] = -1;
+        return res;
+    }
+    for (int k = 0; k <= ps; ++k) {
+        re[m[pi][pp]] = k;
+        const auto r = Day10_p2_bt(m, re);
+        re[m[pi][pp]] = -1;
+        if (r >= 0) {
+            res = res < 0? r: std::min(res, r);
+        }
+    }
+    return res;
+}
+
+int Day10_part2(std::string_view joltage, const std::vector<int>& v) {
+    std::vector<int> target;
+    const char *p = joltage.data() + 1;
+    while (p) {
+        target.push_back(std::atoi(p));
+        const auto p2 = strchr(p, ',');
+        p = p2? p2 + 1: nullptr;
+    }
+    std::vector<std::vector<int>> m;
+    m.resize(target.size());
+    for (int i = 0; i < target.size(); ++i) {
+        m[i].push_back(target[i]);
+        for (int j = 0; j < v.size(); ++j) {
+            if (v[j] & (1 << i)) {
+                m[i].push_back(j);
+            }
+        }
+    }
+    std::vector<int> re(v.size(), -1);
+    const auto res = Day10_p2_bt(m, re);
+    PRINT(res);
+    return res;
+}
+
+DAY(10, utils::FileReader& reader, int part) {
+    long long res = 0;
+    for (auto line : reader) {
+        const auto els = line.split(" ");
+        std::vector<int> v;
+        for (int i = 1; i < els.size() - 1; ++i) {
+            int& comb = v.emplace_back(0);
+            for (int j = 1; j < els[i].size(); j += 2) {
+                comb |= 1 << (els[i][j] - '0');
+            }
+        }
+        res += part == 1? Day10_part1(els.front(), v): Day10_part2(els.back(), v);
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(9, utils::FileReader& reader, int part) {
+    long long res = 0;
+    std::vector<utils::Coord> v;
+    for (auto line : reader) {
+        long a = 0, b = 0;
+        line.read("%d,%d", &a, &b);
+        v.emplace_back(a, b);
+    }
+    for (int i = 0; i < v.size(); ++i) {
+        for (int j = i + 1; j < v.size(); ++j) {
+            const auto d = v[j] - v[i];
+            long long area = static_cast<long long>(std::abs(d.i) + 1) * (std::abs(d.j) + 1);
+            if (area > res) {
+                bool ok = true;
+                if (part == 2) {
+                    if (d.i != 0 && d.j != 0) {
+                        const auto a = utils::Coord(std::min(v[j].i, v[i].i), std::min(v[j].j, v[i].j));
+                        const auto b = utils::Coord(std::max(v[j].i, v[i].i), std::max(v[j].j, v[i].j));
+                        for (int k = 0; ok && k < v.size(); ++k) {
+                            const auto k1 = (k + 1) % v.size();
+                            const auto ka = utils::Coord(std::min(v[k].i, v[k1].i), std::min(v[k].j, v[k1].j));
+                            const auto kb = utils::Coord(std::max(v[k].i, v[k1].i), std::max(v[k].j, v[k1].j));
+                            if ((ka.i == kb.i && ka.i > a.i && kb.i < b.i && ka.j < b.j && kb.j > a.j)) {
+                                ok = false;
+                            }
+                            if ((ka.j == kb.j && ka.j > a.j && kb.j < b.j && ka.i < b.i && kb.i > a.i)) {
+                                ok = false;
+                            }
+                        }
+                    }
+                }
+                if (ok) {
+                    res = std::max(res, area);
+                }
+            }
+        }
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
+DAY(8, utils::FileReader& reader, int part) {
+    long long res = 0;
+    using D3 = std::tuple<int, int, int>;
+    std::vector<D3> v;
+    for (auto line : reader) {
+        long x, y, z;
+        if (!line.read("%d,%d,%d", &x, &y, &z)) {
+            break;
+        }
+        v.emplace_back(x, y, z);
+    }
+    std::vector<std::tuple<long long, int, int>> edges;
+    edges.reserve(v.size() * (v.size() - 1) / 2);
+    for (int i = 0; i < v.size(); ++i) {
+        for (int j = i + 1; j < v.size(); ++j) {
+            const auto [x1, y1, z1] = v[i];
+            const auto [x2, y2, z2] = v[j];
+            const auto d = static_cast<long long>(x1 - x2) * (x1 - x2) + static_cast<long long>(y1 - y2) * (y1 - y2) + static_cast<long long>(z1 - z2) * (z1 - z2);
+            edges.emplace_back(d, i, j);
+        }
+    }
+    // compute minimum spanning tree
+    std::sort(edges.begin(), edges.end(), [](const auto& a, const auto& b) {
+        return std::get<0>(a) < std::get<0>(b);
+    });
+    std::vector<int> pars(v.size());
+    std::iota(pars.begin(), pars.end(), 0);
+    std::function<int(int)> find;
+    find = [&pars,&find](int i) {
+        if (pars[i] != i) {
+            pars[i] = find(pars[i]);
+        }
+        return pars[i];
+    };
+    const auto unite = [&pars](int i, int j) {
+        // todo: rank?
+        pars[i] = j;
+    };
+    int n = 0;
+    for (auto [d, i, j] : edges) {
+        auto pi = find(i);
+        auto pj = find(j);
+        if (pi != pj) {
+            unite(pi, pj);
+            if (part == 2 && ++n == v.size() - 1) {
+                res = std::get<0>(v[i]) * std::get<0>(v[j]);
+                break;
+            }
+        }
+        if (part == 1 && ++n == 1000) {
+            break;
+        }
+    }
+    if (part == 1) {
+        // find the 3 largest components
+        std::vector<int> sizes(v.size());
+        for (int i = 0; i < pars.size(); ++i) {
+            sizes[find(i)]++;
+        }
+        std::nth_element(sizes.begin(), sizes.begin() + 3, sizes.end(), std::greater<int>());
+        res = sizes[0] * sizes[1] * sizes[2];
+    }
+    printf("Res%d = %lld\n", part, res);
+}
+//-----------------------------------------------------------------------------
 DAY(7, utils::FileReader& reader, int part) {
     long long res = 0;
     std::vector<long long> v;
